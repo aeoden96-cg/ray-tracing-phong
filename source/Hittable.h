@@ -3,6 +3,19 @@
 
 #include "utils.h"
 
+class Hittable;
+
+struct hit_record {
+    hit_record() : object(nullptr){}
+    float t;
+    glm::vec3 p;
+    glm::vec3 normal;
+    MaterialType material;
+    Hittable *object = nullptr;
+    glm::vec2 st;
+    glm::vec2 uv;
+};
+
 class Hittable
 {
  public:

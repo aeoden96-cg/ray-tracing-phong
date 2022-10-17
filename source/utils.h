@@ -19,6 +19,16 @@ const float kInfinity = std::numeric_limits<float>::max();
 
 enum MaterialType { DIFFUSE_AND_GLOSSY, REFLECTION_AND_REFRACTION, REFLECTION };
 
+/*struct Material
+{
+    MaterialType type;
+    glm::vec3 color;
+    float ior; // index of refraction
+    float diffuse;
+    float specular;
+    float roughness;
+};*/
+
 
 struct Options
 {

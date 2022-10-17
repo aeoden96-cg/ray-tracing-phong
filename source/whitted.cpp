@@ -55,22 +55,21 @@
 bool trace(
     const glm::vec3 &orig, const glm::vec3 &dir,
     const std::vector<std::unique_ptr<Hittable>> &objects,
-    float &tNear, uint32_t &index, glm::vec2 &uv, Hittable **hitObject)
+    float &tNear, uint32_t &index, glm::vec2 &uv, hit_record &rec)
 {
-    *hitObject = nullptr;
     for (uint32_t k = 0; k < objects.size(); ++k) {
         float tNearK = kInfinity;
         uint32_t indexK;
         glm::vec2 uvK;
         if (objects[k]->intersect(orig, dir, tNearK, indexK, uvK) && tNearK < tNear) {
-            *hitObject = objects[k].get();
+            rec.object = objects[k].get();
             tNear = tNearK;
             index = indexK;
             uv = uvK;
         }
     }
 
-    return (*hitObject != nullptr);
+    return (rec.object != nullptr);
 }
 
 // Implementation of the Whitted-syle light transport algorithm (E [S*] (D|G) L)
@@ -98,23 +97,27 @@ glm::vec3 castRay(
     if (depth > options.maxDepth) {
         return options.backgroundColor;
     }
-    
+
     glm::vec3 hitColor = options.backgroundColor;
     float tnear = kInfinity;
     glm::vec2 uv;
     uint32_t index = 0;
-    Hittable *hitObject = nullptr;
-    if (trace(orig, dir, objects, tnear, index, uv, &hitObject)) {
+
+    hit_record rec;
+    //Hittable *hitObject = nullptr;
+
+
+    if (trace(orig, dir, objects, tnear, index, uv, rec)) {
         glm::vec3 hitPoint = orig + dir * tnear;
         glm::vec3 N; // normal
         glm::vec2 st; // st coordinates
-        hitObject->getSurfaceProperties(hitPoint, dir, index, uv, N, st);
+        rec.object->getSurfaceProperties(hitPoint, dir, index, uv, N, st);
         glm::vec3 tmp = hitPoint;
-        switch (hitObject->materialType) {
+        switch (rec.object->materialType) {
             case REFLECTION_AND_REFRACTION:
             {
                 glm::vec3 reflectionDirection = normalize(reflect(dir, N));
-                glm::vec3 refractionDirection = normalize(refract(dir, N, hitObject->ior));
+                glm::vec3 refractionDirection = normalize(refract(dir, N, rec.object->ior));
                 glm::vec3 reflectionRayOrig = (glm::dot(reflectionDirection, N) < 0) ?
                     hitPoint - N * options.bias :
                     hitPoint + N * options.bias;
@@ -124,14 +127,14 @@ glm::vec3 castRay(
                 glm::vec3 reflectionColor = castRay(reflectionRayOrig, reflectionDirection, objects, lights, options, depth + 1, 1);
                 glm::vec3 refractionColor = castRay(refractionRayOrig, refractionDirection, objects, lights, options, depth + 1, 1);
                 float kr;
-                fresnel(dir, N, hitObject->ior, kr);
+                fresnel(dir, N, rec.object->ior, kr);
                 hitColor = reflectionColor * kr + refractionColor * (1 - kr);
                 break;
             }
             case REFLECTION:
             {
                 float kr;
-                fresnel(dir, N, hitObject->ior, kr);
+                fresnel(dir, N, rec.object->ior, kr);
                 glm::vec3 reflectionDirection = reflect(dir, N);
                 glm::vec3 reflectionRayOrig = (glm::dot(reflectionDirection, N) < 0) ?
                     hitPoint + N * options.bias :
@@ -159,10 +162,11 @@ glm::vec3 castRay(
                     float lightDistance2 = glm::dot(lightDir, lightDir);
                     lightDir = normalize(lightDir);
                     float LdotN = std::max(0.f, glm::dot(lightDir, N));
-                    Hittable *shadowHitObject = nullptr;
+                    //Hittable *shadowHitObject = nullptr;
+                    hit_record shadowRec;
                     float tNearShadow = kInfinity;
                     // is the point in shadow, and is the nearest occluding Hittable closer to the Hittable than the light itself?
-                    bool inShadow = trace(shadowPointOrig, lightDir, objects, tNearShadow, index, uv, &shadowHitObject) &&
+                    bool inShadow = trace(shadowPointOrig, lightDir, objects, tNearShadow, index, uv, shadowRec) &&
                         tNearShadow * tNearShadow < lightDistance2;
 
                     if(!inShadow) {
@@ -171,9 +175,9 @@ glm::vec3 castRay(
 
 
                     glm::vec3 reflectionDirection = reflect(-lightDir, N);
-                    specularColor += powf(std::max(0.f, -glm::dot(reflectionDirection, dir)), hitObject->specularExponent) * lights[i]->intensity;
+                    specularColor += powf(std::max(0.f, -glm::dot(reflectionDirection, dir)), rec.object->specularExponent) * lights[i]->intensity;
                 }
-                hitColor = lightAmt * hitObject->evalDiffuseColor(st) * hitObject->Kd + specularColor * hitObject->Ks;
+                hitColor = lightAmt * rec.object->evalDiffuseColor(st) * rec.object->Kd + specularColor * rec.object->Ks;
                 break;
             }
         }
