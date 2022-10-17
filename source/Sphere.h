@@ -8,7 +8,7 @@
 class Sphere : public Hittable{
 public:
     Sphere(const glm::vec3 &c, const float &r) : center(c), radius(r), radius2(r * r) {}
-    bool intersect(const glm::vec3 &orig, const glm::vec3 &dir, float &tnear, uint32_t &index, glm::vec2 &uv) const
+    bool intersect(const glm::vec3 &orig, const glm::vec3 &dir, float &tnear, uint32_t &index, glm::vec2 &uv,hit_record& rec) const
     {
         // analytic solution
         glm::vec3 L = orig - center;
@@ -24,8 +24,8 @@ public:
         return true;
     }
 
-    void getSurfaceProperties(const glm::vec3 &P, const glm::vec3 &I, const uint32_t &index, const glm::vec2 &uv, glm::vec3 &N, glm::vec2 &st) const
-    { N = normalize(P - center); }
+    void getSurfaceProperties(const glm::vec3 &I, hit_record& rec) const
+    { rec.normal = normalize(rec.p - center); }
 
     glm::vec3 center;
     float radius, radius2;

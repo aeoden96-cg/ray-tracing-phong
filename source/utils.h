@@ -79,6 +79,6 @@ glm::vec3 refract(const glm::vec3 &I, const glm::vec3 &N, const float &ior);
 // \param ior is the mateural refractive index
 //
 // \param[out] kr is the amount of light reflected
-void fresnel(const glm::vec3 &I, const glm::vec3 &N, const float &ior, float &kr);
+float fresnel(const glm::vec3 &I, const glm::vec3 &N, const float &ior);
 
 #endif // UTILS_H

@@ -6,7 +6,7 @@
 class Hittable;
 
 struct hit_record {
-    hit_record() : object(nullptr){}
+    hit_record() : object(nullptr),t(kInfinity) {}
     float t;
     glm::vec3 p;
     glm::vec3 normal;
@@ -14,6 +14,7 @@ struct hit_record {
     Hittable *object = nullptr;
     glm::vec2 st;
     glm::vec2 uv;
+    int triIndex;
 };
 
 class Hittable
@@ -23,8 +24,10 @@ class Hittable
         materialType(DIFFUSE_AND_GLOSSY),
         ior(1.3), Kd(0.8), Ks(0.2), diffuseColor(0.2), specularExponent(25) {}
     virtual ~Hittable() {}
-    virtual bool intersect(const glm::vec3 &, const glm::vec3 &, float &, uint32_t &, glm::vec2 &) const = 0;
-    virtual void getSurfaceProperties(const glm::vec3 &, const glm::vec3 &, const uint32_t &, const glm::vec2 &, glm::vec3 &, glm::vec2 &) const = 0;
+    virtual bool intersect(const glm::vec3 &, const glm::vec3 &, float &, uint32_t &, glm::vec2 &,hit_record& rec) const = 0;
+    virtual void getSurfaceProperties(
+        const glm::vec3 &,
+        hit_record& rec) const = 0;
     virtual glm::vec3 evalDiffuseColor(const glm::vec2 &) const { return diffuseColor; }
     // material properties
     MaterialType materialType;

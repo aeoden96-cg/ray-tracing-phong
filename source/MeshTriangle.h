@@ -26,7 +26,14 @@ public:
         memcpy(stCoordinates.get(), st, sizeof(glm::vec2) * maxIndex);
     }
 
-    bool intersect(const glm::vec3 &orig, const glm::vec3 &dir, float &tnear, uint32_t &index, glm::vec2 &uv) const
+    bool intersect(
+        const glm::vec3 &orig,
+        const glm::vec3 &dir,
+        float &tnear, 
+        uint32_t &index, 
+        glm::vec2 &uv,
+        hit_record& rec
+        ) const
     {
         bool intersect = false;
         for (uint32_t k = 0; k < numTriangles; ++k) {
@@ -46,18 +53,20 @@ public:
         return intersect;
     }
 
-    void getSurfaceProperties(const glm::vec3 &P, const glm::vec3 &I, const uint32_t &index, const glm::vec2 &uv, glm::vec3 &N, glm::vec2 &st) const
+    void getSurfaceProperties(
+        const glm::vec3 &I, 
+        hit_record& rec) const
     {
-        const glm::vec3 &v0 = vertices[vertexIndex[index * 3]];
-        const glm::vec3 &v1 = vertices[vertexIndex[index * 3 + 1]];
-        const glm::vec3 &v2 = vertices[vertexIndex[index * 3 + 2]];
+        const glm::vec3 &v0 = vertices[vertexIndex[rec.triIndex * 3]];
+        const glm::vec3 &v1 = vertices[vertexIndex[rec.triIndex * 3 + 1]];
+        const glm::vec3 &v2 = vertices[vertexIndex[rec.triIndex * 3 + 2]];
         glm::vec3 e0 = normalize(v1 - v0);
         glm::vec3 e1 = normalize(v2 - v1);
-        N = normalize(glm::cross(e0, e1));
-        const glm::vec2 &st0 = stCoordinates[vertexIndex[index * 3]];
-        const glm::vec2 &st1 = stCoordinates[vertexIndex[index * 3 + 1]];
-        const glm::vec2 &st2 = stCoordinates[vertexIndex[index * 3 + 2]];
-        st = st0 * (1 - uv.x - uv.y) + st1 * uv.x + st2 * uv.y;
+        rec.normal = normalize(glm::cross(e0, e1));;
+        const glm::vec2 &st0 = stCoordinates[vertexIndex[rec.triIndex * 3]];
+        const glm::vec2 &st1 = stCoordinates[vertexIndex[rec.triIndex * 3 + 1]];
+        const glm::vec2 &st2 = stCoordinates[vertexIndex[rec.triIndex * 3 + 2]];
+        rec.st = st0 * (1 - rec.uv.x - rec.uv.y) + st1 * rec.uv.x + st2 * rec.uv.y;
     }
 
     glm::vec3 evalDiffuseColor(const glm::vec2 &st) const
