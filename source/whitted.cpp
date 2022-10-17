@@ -32,19 +32,6 @@
 
 
 
-
-inline
-float clamp(const float &lo, const float &hi, const float &v)
-{ return std::max(lo, std::min(hi, v)); }
-
-inline
-float deg2rad(const float &deg)
-{ return deg * M_PI / 180; }
-
-inline
-glm::vec3 mix(const glm::vec3 &a, const glm::vec3& b, const float &mixValue)
-{ return a * (1 - mixValue) + b * mixValue; }
-
 struct Options
 {
     uint32_t width;
@@ -84,21 +71,7 @@ class Object
     float specularExponent;
 };
 
-bool solveQuadratic(const float &a, const float &b, const float &c, float &x0, float &x1)
-{
-    float discr = b * b - 4 * a * c;
-    if (discr < 0) return false;
-    else if (discr == 0) x0 = x1 = - 0.5 * b / a;
-    else {
-        float q = (b > 0) ?
-            -0.5 * (b + sqrt(discr)) :
-            -0.5 * (b - sqrt(discr));
-        x0 = q / a;
-        x1 = c / q;
-    }
-    if (x0 > x1) std::swap(x0, x1);
-    return true;
-}
+
 
 class Sphere : public Object{
 public:
@@ -246,7 +219,7 @@ glm::vec3 reflect(const glm::vec3 &I, const glm::vec3 &N)
 // [/comment]
 glm::vec3 refract(const glm::vec3 &I, const glm::vec3 &N, const float &ior)
 {
-    float cosi = clamp(-1, 1, glm::dot(I, N));
+    float cosi = clamp_(-1, 1, glm::dot(I, N));
     float etai = 1, etat = ior;
     glm::vec3 n = N;
     if (cosi < 0) { cosi = -cosi; } else { std::swap(etai, etat); n= -N; }
@@ -268,7 +241,7 @@ glm::vec3 refract(const glm::vec3 &I, const glm::vec3 &N, const float &ior)
 // [/comment]
 void fresnel(const glm::vec3 &I, const glm::vec3 &N, const float &ior, float &kr)
 {
-    float cosi = clamp(-1, 1, glm::dot(I, N));
+    float cosi = clamp_(-1, 1, glm::dot(I, N));
     float etai = 1, etat = ior;
     if (cosi > 0) {  std::swap(etai, etat); }
     // Compute sini using Snell's law
@@ -451,7 +424,7 @@ void render(
 {
     glm::vec3 *framebuffer = new glm::vec3[options.width * options.height];
     glm::vec3 *pix = framebuffer;
-    float scale = tan(deg2rad(options.fov * 0.5));
+    float scale = tan(glm::radians(options.fov * 0.5));
     float imageAspectRatio = options.width / (float)options.height;
     glm::vec3 orig(0);
     for (uint32_t j = 0; j < options.height; ++j) {
@@ -469,9 +442,9 @@ void render(
     ofs.open("./out.ppm");
     ofs << "P6\n" << options.width << " " << options.height << "\n255\n";
     for (uint32_t i = 0; i < options.height * options.width; ++i) {
-        char r = (char)(255 * clamp(0, 1, framebuffer[i].x));
-        char g = (char)(255 * clamp(0, 1, framebuffer[i].y));
-        char b = (char)(255 * clamp(0, 1, framebuffer[i].z));
+        char r = (char)(255 * clamp_(0, 1, framebuffer[i].x));
+        char g = (char)(255 * clamp_(0, 1, framebuffer[i].y));
+        char b = (char)(255 * clamp_(0, 1, framebuffer[i].z));
         ofs << r << g << b;
     }
 

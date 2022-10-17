@@ -19,6 +19,11 @@ const float kInfinity = std::numeric_limits<float>::max();
 
 
 
+float clamp_(const float &lo, const float &hi, const float &v);
+
+glm::vec3 mix(const glm::vec3 &a, const glm::vec3& b, const float &mixValue);
+
+bool solveQuadratic(const float &a, const float &b, const float &c, float &x0, float &x1);
 
 
 
