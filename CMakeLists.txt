@@ -7,6 +7,12 @@ ADD_EXECUTABLE(PROJECT
         source/whitted.cpp
         source/utils.cpp
         source/utils.h
+        source/Hittable.h
+        source/Hittable.cpp
+        source/Sphere.h
+        source/Sphere.cpp
+        source/MeshTriangle.h
+        source/MeshTriangle.cpp
 )
 
 target_link_libraries(

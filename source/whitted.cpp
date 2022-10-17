@@ -29,6 +29,9 @@
 
 
 #include "utils.h"
+#include "Hittable.h"
+#include "Sphere.h"
+#include "MeshTriangle.h"
 
 
 
@@ -51,150 +54,9 @@ public:
     glm::vec3 intensity;
 };
 
-enum MaterialType { DIFFUSE_AND_GLOSSY, REFLECTION_AND_REFRACTION, REFLECTION };
-
-class Object
-{
- public:
-    Object() :
-        materialType(DIFFUSE_AND_GLOSSY),
-        ior(1.3), Kd(0.8), Ks(0.2), diffuseColor(0.2), specularExponent(25) {}
-    virtual ~Object() {}
-    virtual bool intersect(const glm::vec3 &, const glm::vec3 &, float &, uint32_t &, glm::vec2 &) const = 0;
-    virtual void getSurfaceProperties(const glm::vec3 &, const glm::vec3 &, const uint32_t &, const glm::vec2 &, glm::vec3 &, glm::vec2 &) const = 0;
-    virtual glm::vec3 evalDiffuseColor(const glm::vec2 &) const { return diffuseColor; }
-    // material properties
-    MaterialType materialType;
-    float ior;
-    float Kd, Ks;
-    glm::vec3 diffuseColor;
-    float specularExponent;
-};
 
 
 
-class Sphere : public Object{
-public:
-    Sphere(const glm::vec3 &c, const float &r) : center(c), radius(r), radius2(r * r) {}
-    bool intersect(const glm::vec3 &orig, const glm::vec3 &dir, float &tnear, uint32_t &index, glm::vec2 &uv) const
-    {
-        // analytic solution
-        glm::vec3 L = orig - center;
-        float a = glm::dot(dir, dir);
-        float b = 2 * glm::dot(dir, L);
-        float c = glm::dot(L, L) - radius2;
-        float t0, t1;
-        if (!solveQuadratic(a, b, c, t0, t1)) return false;
-        if (t0 < 0) t0 = t1;
-        if (t0 < 0) return false;
-        tnear = t0;
-
-        return true;
-    }
-    
-    void getSurfaceProperties(const glm::vec3 &P, const glm::vec3 &I, const uint32_t &index, const glm::vec2 &uv, glm::vec3 &N, glm::vec2 &st) const
-    { N = normalize(P - center); }
-
-    glm::vec3 center;
-    float radius, radius2;
-};
-
-bool rayTriangleIntersect(
-    const glm::vec3 &v0, const glm::vec3 &v1, const glm::vec3 &v2,
-    const glm::vec3 &orig, const glm::vec3 &dir,
-    float &tnear, float &u, float &v)
-{
-    glm::vec3 edge1 = v1 - v0;
-    glm::vec3 edge2 = v2 - v0;
-    glm::vec3 pvec = glm::cross(dir, edge2);
-    float det = glm::dot(edge1, pvec);
-    if (det == 0 || det < 0) return false;
-
-    glm::vec3 tvec = orig - v0;
-    u = glm::dot(tvec, pvec);
-    if (u < 0 || u > det) return false;
-
-    glm::vec3 qvec = glm::cross(tvec, edge1);
-    v = glm::dot(dir, qvec);
-    if (v < 0 || u + v > det) return false;
-
-    float invDet = 1 / det;
-    
-    tnear = glm::dot(edge2, qvec) * invDet;
-    u *= invDet;
-    v *= invDet;
-
-    return true;
-}
-
-class MeshTriangle : public Object
-{
-public:
-    MeshTriangle(
-        const glm::vec3 *verts,
-        const uint32_t *vertsIndex,
-        const uint32_t &numTris,
-        const glm::vec2 *st)
-    {
-        uint32_t maxIndex = 0;
-        for (uint32_t i = 0; i < numTris * 3; ++i)
-            if (vertsIndex[i] > maxIndex) maxIndex = vertsIndex[i];
-        maxIndex += 1;
-        vertices = std::unique_ptr<glm::vec3[]>(new glm::vec3[maxIndex]);
-        memcpy(vertices.get(), verts, sizeof(glm::vec3) * maxIndex);
-        vertexIndex = std::unique_ptr<uint32_t[]>(new uint32_t[numTris * 3]);
-        memcpy(vertexIndex.get(), vertsIndex, sizeof(uint32_t) * numTris * 3);
-        numTriangles = numTris;
-        stCoordinates = std::unique_ptr<glm::vec2[]>(new glm::vec2[maxIndex]);
-        memcpy(stCoordinates.get(), st, sizeof(glm::vec2) * maxIndex);
-    }
-
-    bool intersect(const glm::vec3 &orig, const glm::vec3 &dir, float &tnear, uint32_t &index, glm::vec2 &uv) const
-    {
-        bool intersect = false;
-        for (uint32_t k = 0; k < numTriangles; ++k) {
-            const glm::vec3 & v0 = vertices[vertexIndex[k * 3]];
-            const glm::vec3 & v1 = vertices[vertexIndex[k * 3 + 1]];
-            const glm::vec3 & v2 = vertices[vertexIndex[k * 3 + 2]];
-            float t, u, v;
-            if (rayTriangleIntersect(v0, v1, v2, orig, dir, t, u, v) && t < tnear) {
-                tnear = t;
-                uv.x = u;
-                uv.y = v;
-                index = k;
-                intersect |= true;
-            }
-        }
-
-        return intersect;
-    }
-
-    void getSurfaceProperties(const glm::vec3 &P, const glm::vec3 &I, const uint32_t &index, const glm::vec2 &uv, glm::vec3 &N, glm::vec2 &st) const
-    {
-        const glm::vec3 &v0 = vertices[vertexIndex[index * 3]];
-        const glm::vec3 &v1 = vertices[vertexIndex[index * 3 + 1]];
-        const glm::vec3 &v2 = vertices[vertexIndex[index * 3 + 2]];
-        glm::vec3 e0 = normalize(v1 - v0);
-        glm::vec3 e1 = normalize(v2 - v1);
-        N = normalize(glm::cross(e0, e1));
-        const glm::vec2 &st0 = stCoordinates[vertexIndex[index * 3]];
-        const glm::vec2 &st1 = stCoordinates[vertexIndex[index * 3 + 1]];
-        const glm::vec2 &st2 = stCoordinates[vertexIndex[index * 3 + 2]];
-        st = st0 * (1 - uv.x - uv.y) + st1 * uv.x + st2 * uv.y;
-    }
-
-    glm::vec3 evalDiffuseColor(const glm::vec2 &st) const
-    {
-        float scale = 5;
-        float pattern = (fmodf(st.x * scale, 1) > 0.5) ^ (fmodf(st.y * scale, 1) > 0.5);
-        return mix(glm::vec3(0.815, 0.235, 0.031), glm::vec3(0.937, 0.937, 0.231), pattern);
-    }
-
-    std::unique_ptr<glm::vec3[]> vertices;
-    uint32_t numTriangles;
-    std::unique_ptr<uint32_t[]> vertexIndex;
-    std::unique_ptr<glm::vec2[]> stCoordinates;
-};
 
 // [comment]
 // Compute reflection direction
@@ -209,7 +71,7 @@ glm::vec3 reflect(const glm::vec3 &I, const glm::vec3 &N)
 //
 // We need to handle with care the two possible situations:
 //
-//    - When the ray is inside the object
+//    - When the ray is inside the Hittable
 //
 //    - When the ray is outside.
 //
@@ -262,7 +124,7 @@ void fresnel(const glm::vec3 &I, const glm::vec3 &N, const float &ior, float &kr
 }
 
 // [comment]
-// Returns true if the ray intersects an object, false otherwise.
+// Returns true if the ray intersects an Hittable, false otherwise.
 //
 // \param orig is the ray origin
 //
@@ -270,20 +132,20 @@ void fresnel(const glm::vec3 &I, const glm::vec3 &N, const float &ior, float &kr
 //
 // \param objects is the list of objects the scene contains
 //
-// \param[out] tNear contains the distance to the cloesest intersected object.
+// \param[out] tNear contains the distance to the cloesest intersected Hittable.
 //
-// \param[out] index stores the index of the intersect triangle if the interesected object is a mesh.
+// \param[out] index stores the index of the intersect triangle if the interesected Hittable is a mesh.
 //
 // \param[out] uv stores the u and v barycentric coordinates of the intersected point
 //
-// \param[out] *hitObject stores the pointer to the intersected object (used to retrieve material information, etc.)
+// \param[out] *hitObject stores the pointer to the intersected Hittable (used to retrieve material information, etc.)
 //
 // \param isShadowRay is it a shadow ray. We can return from the function sooner as soon as we have found a hit.
 // [/comment]
 bool trace(
     const glm::vec3 &orig, const glm::vec3 &dir,
-    const std::vector<std::unique_ptr<Object>> &objects,
-    float &tNear, uint32_t &index, glm::vec2 &uv, Object **hitObject)
+    const std::vector<std::unique_ptr<Hittable>> &objects,
+    float &tNear, uint32_t &index, glm::vec2 &uv, Hittable **hitObject)
 {
     *hitObject = nullptr;
     for (uint32_t k = 0; k < objects.size(); ++k) {
@@ -307,7 +169,7 @@ bool trace(
 // This function is the function that compute the color at the intersection point
 // of a ray defined by a position and a direction. Note that thus function is recursive (it calls itself).
 //
-// If the material of the intersected object is either reflective or reflective and refractive,
+// If the material of the intersected Hittable is either reflective or reflective and refractive,
 // then we compute the reflection/refracton direction and cast two new rays into the scene
 // by calling the castRay() function recursively. When the surface is transparent, we mix
 // the reflection and refraction color using the result of the fresnel equations (it computes
@@ -319,7 +181,7 @@ bool trace(
 // [/comment]
 glm::vec3 castRay(
     const glm::vec3 &orig, const glm::vec3 &dir,
-    const std::vector<std::unique_ptr<Object>> &objects,
+    const std::vector<std::unique_ptr<Hittable>> &objects,
     const std::vector<std::unique_ptr<Light>> &lights,
     const Options &options,
     uint32_t depth,
@@ -333,7 +195,7 @@ glm::vec3 castRay(
     float tnear = kInfinity;
     glm::vec2 uv;
     uint32_t index = 0;
-    Object *hitObject = nullptr;
+    Hittable *hitObject = nullptr;
     if (trace(orig, dir, objects, tnear, index, uv, &hitObject)) {
         glm::vec3 hitPoint = orig + dir * tnear;
         glm::vec3 N; // normal
@@ -389,9 +251,9 @@ glm::vec3 castRay(
                     float lightDistance2 = glm::dot(lightDir, lightDir);
                     lightDir = normalize(lightDir);
                     float LdotN = std::max(0.f, glm::dot(lightDir, N));
-                    Object *shadowHitObject = nullptr;
+                    Hittable *shadowHitObject = nullptr;
                     float tNearShadow = kInfinity;
-                    // is the point in shadow, and is the nearest occluding object closer to the object than the light itself?
+                    // is the point in shadow, and is the nearest occluding Hittable closer to the Hittable than the light itself?
                     bool inShadow = trace(shadowPointOrig, lightDir, objects, tNearShadow, index, uv, &shadowHitObject) &&
                         tNearShadow * tNearShadow < lightDistance2;
 
@@ -419,7 +281,7 @@ glm::vec3 castRay(
 // [/comment]
 void render(
     const Options &options,
-    const std::vector<std::unique_ptr<Object>> &objects,
+    const std::vector<std::unique_ptr<Hittable>> &objects,
     const std::vector<std::unique_ptr<Light>> &lights)
 {
     glm::vec3 *framebuffer = new glm::vec3[options.width * options.height];
@@ -461,7 +323,7 @@ void render(
 int main(int argc, char **argv)
 {
     // creating the scene (adding objects and lights)
-    std::vector<std::unique_ptr<Object>> objects;
+    std::vector<std::unique_ptr<Hittable>> objects;
     std::vector<std::unique_ptr<Light>> lights;
     
     Sphere *sph1 = new Sphere(glm::vec3(-1, 0, -12), 2);
