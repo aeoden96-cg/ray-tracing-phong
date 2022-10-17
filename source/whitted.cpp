@@ -32,98 +32,9 @@
 #include "Hittable.h"
 #include "Sphere.h"
 #include "MeshTriangle.h"
+#include "Light.h"
 
 
-
-struct Options
-{
-    uint32_t width;
-    uint32_t height;
-    float fov;
-    float imageAspectRatio;
-    uint8_t maxDepth;
-    glm::vec3 backgroundColor;
-    float bias;
-};
-
-class Light
-{
-public:
-    Light(const glm::vec3 &p, const glm::vec3 &i) : position(p), intensity(i) {}
-    glm::vec3 position;
-    glm::vec3 intensity;
-};
-
-
-
-
-
-// [comment]
-// Compute reflection direction
-// [/comment]
-glm::vec3 reflect(const glm::vec3 &I, const glm::vec3 &N)
-{
-    return I - 2 * glm::dot(I, N) * N;
-}
-
-// [comment]
-// Compute refraction direction using Snell's law
-//
-// We need to handle with care the two possible situations:
-//
-//    - When the ray is inside the Hittable
-//
-//    - When the ray is outside.
-//
-// If the ray is outside, you need to make cosi positive cosi = -N.I
-//
-// If the ray is inside, you need to invert the refractive indices and negate the normal N
-// [/comment]
-glm::vec3 refract(const glm::vec3 &I, const glm::vec3 &N, const float &ior)
-{
-    float cosi = clamp_(-1, 1, glm::dot(I, N));
-    float etai = 1, etat = ior;
-    glm::vec3 n = N;
-    if (cosi < 0) { cosi = -cosi; } else { std::swap(etai, etat); n= -N; }
-    float eta = etai / etat;
-    float k = 1 - eta * eta * (1 - cosi * cosi);
-    return k < 0 ? glm::vec3(0,0,0) : eta * I + (eta * cosi - sqrtf(k)) * n;
-}
-
-// [comment]
-// Compute Fresnel equation
-//
-// \param I is the incident view direction
-//
-// \param N is the normal at the intersection point
-//
-// \param ior is the mateural refractive index
-//
-// \param[out] kr is the amount of light reflected
-// [/comment]
-void fresnel(const glm::vec3 &I, const glm::vec3 &N, const float &ior, float &kr)
-{
-    float cosi = clamp_(-1, 1, glm::dot(I, N));
-    float etai = 1, etat = ior;
-    if (cosi > 0) {  std::swap(etai, etat); }
-    // Compute sini using Snell's law
-    float sint = etai / etat * sqrtf(std::max(0.f, 1 - cosi * cosi));
-    // Total internal reflection
-    if (sint >= 1) {
-        kr = 1;
-    }
-    else {
-        float cost = sqrtf(std::max(0.f, 1 - sint * sint));
-        cosi = fabsf(cosi);
-        float Rs = ((etat * cosi) - (etai * cost)) / ((etat * cosi) + (etai * cost));
-        float Rp = ((etai * cosi) - (etat * cost)) / ((etai * cosi) + (etat * cost));
-        kr = (Rs * Rs + Rp * Rp) / 2;
-    }
-    // As a consequence of the conservation of energy, transmittance is given by:
-    // kt = 1 - kr;
-}
-
-// [comment]
 // Returns true if the ray intersects an Hittable, false otherwise.
 //
 // \param orig is the ray origin
@@ -141,7 +52,6 @@ void fresnel(const glm::vec3 &I, const glm::vec3 &N, const float &ior, float &kr
 // \param[out] *hitObject stores the pointer to the intersected Hittable (used to retrieve material information, etc.)
 //
 // \param isShadowRay is it a shadow ray. We can return from the function sooner as soon as we have found a hit.
-// [/comment]
 bool trace(
     const glm::vec3 &orig, const glm::vec3 &dir,
     const std::vector<std::unique_ptr<Hittable>> &objects,
@@ -163,7 +73,6 @@ bool trace(
     return (*hitObject != nullptr);
 }
 
-// [comment]
 // Implementation of the Whitted-syle light transport algorithm (E [S*] (D|G) L)
 //
 // This function is the function that compute the color at the intersection point
@@ -178,7 +87,6 @@ bool trace(
 //
 // If the surface is duffuse/glossy we use the Phong illumation model to compute the color
 // at the intersection point.
-// [/comment]
 glm::vec3 castRay(
     const glm::vec3 &orig, const glm::vec3 &dir,
     const std::vector<std::unique_ptr<Hittable>> &objects,
@@ -315,24 +223,22 @@ void render(
     delete [] framebuffer;
 }
 
-// [comment]
 // In the main function of the program, we create the scene (create objects and lights)
 // as well as set the options for the render (image widht and height, maximum recursion
 // depth, field-of-view, etc.). We then call the render function().
-// [/comment]
 int main(int argc, char **argv)
 {
     // creating the scene (adding objects and lights)
     std::vector<std::unique_ptr<Hittable>> objects;
     std::vector<std::unique_ptr<Light>> lights;
-    
+
     Sphere *sph1 = new Sphere(glm::vec3(-1, 0, -12), 2);
     sph1->materialType = DIFFUSE_AND_GLOSSY;
     sph1->diffuseColor = glm::vec3(0.6, 0.7, 0.8);
     Sphere *sph2 = new Sphere(glm::vec3(0.5, -0.5, -8), 1.5);
     sph2->ior = 1.5;
     sph2->materialType = REFLECTION_AND_REFRACTION;
-    
+
     objects.push_back(std::unique_ptr<Sphere>(sph1));
     objects.push_back(std::unique_ptr<Sphere>(sph2));
 

@@ -13,6 +13,8 @@ ADD_EXECUTABLE(PROJECT
         source/Sphere.cpp
         source/MeshTriangle.h
         source/MeshTriangle.cpp
+        source/Light.h
+        source/Light.cpp
 )
 
 target_link_libraries(
