@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 17)
 
 ADD_EXECUTABLE(PROJECT
         source/whitted.cpp
+        source/utils.cpp
+        source/utils.h
 )
 
 target_link_libraries(

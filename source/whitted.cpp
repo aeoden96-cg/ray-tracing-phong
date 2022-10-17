@@ -28,47 +28,10 @@
 //[/ignore]
 
 
-#include <cstdio>
-#include <cstdlib>
-#include <memory>
-#include <vector>
-#include <utility>
-#include <cstdint>
-#include <iostream>
-#include <fstream>
-#include <cmath>
-#include <cstring>
-
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
-const float kInfinity = std::numeric_limits<float>::max();
+#include "utils.h"
 
 
 
-glm::vec3 normalize(const glm::vec3 &v)
-{
-    float mag2 = v.x * v.x + v.y * v.y + v.z * v.z;
-    if (mag2 > 0) {
-        float invMag = 1 / sqrtf(mag2);
-        return glm::vec3(v.x * invMag, v.y * invMag, v.z * invMag);
-    }
-
-    return v;
-}
-
-inline
-float dotProduct(const glm::vec3 &a, const glm::vec3 &b)
-{ return a.x * b.x + a.y * b.y + a.z * b.z; }
-
-glm::vec3 crossProduct(const glm::vec3 &a, const glm::vec3 &b)
-{
-    return glm::vec3(
-        a.y * b.z - a.z * b.y,
-        a.z * b.x - a.x * b.z,
-        a.x * b.y - a.y * b.x
-    );
-}
 
 inline
 float clamp(const float &lo, const float &hi, const float &v)
@@ -144,9 +107,9 @@ public:
     {
         // analytic solution
         glm::vec3 L = orig - center;
-        float a = dotProduct(dir, dir);
-        float b = 2 * dotProduct(dir, L);
-        float c = dotProduct(L, L) - radius2;
+        float a = glm::dot(dir, dir);
+        float b = 2 * glm::dot(dir, L);
+        float c = glm::dot(L, L) - radius2;
         float t0, t1;
         if (!solveQuadratic(a, b, c, t0, t1)) return false;
         if (t0 < 0) t0 = t1;
@@ -170,21 +133,21 @@ bool rayTriangleIntersect(
 {
     glm::vec3 edge1 = v1 - v0;
     glm::vec3 edge2 = v2 - v0;
-    glm::vec3 pvec = crossProduct(dir, edge2);
-    float det = dotProduct(edge1, pvec);
+    glm::vec3 pvec = glm::cross(dir, edge2);
+    float det = glm::dot(edge1, pvec);
     if (det == 0 || det < 0) return false;
 
     glm::vec3 tvec = orig - v0;
-    u = dotProduct(tvec, pvec);
+    u = glm::dot(tvec, pvec);
     if (u < 0 || u > det) return false;
 
-    glm::vec3 qvec = crossProduct(tvec, edge1);
-    v = dotProduct(dir, qvec);
+    glm::vec3 qvec = glm::cross(tvec, edge1);
+    v = glm::dot(dir, qvec);
     if (v < 0 || u + v > det) return false;
 
     float invDet = 1 / det;
     
-    tnear = dotProduct(edge2, qvec) * invDet;
+    tnear = glm::dot(edge2, qvec) * invDet;
     u *= invDet;
     v *= invDet;
 
@@ -240,7 +203,7 @@ public:
         const glm::vec3 &v2 = vertices[vertexIndex[index * 3 + 2]];
         glm::vec3 e0 = normalize(v1 - v0);
         glm::vec3 e1 = normalize(v2 - v1);
-        N = normalize(crossProduct(e0, e1));
+        N = normalize(glm::cross(e0, e1));
         const glm::vec2 &st0 = stCoordinates[vertexIndex[index * 3]];
         const glm::vec2 &st1 = stCoordinates[vertexIndex[index * 3 + 1]];
         const glm::vec2 &st2 = stCoordinates[vertexIndex[index * 3 + 2]];
@@ -265,7 +228,7 @@ public:
 // [/comment]
 glm::vec3 reflect(const glm::vec3 &I, const glm::vec3 &N)
 {
-    return I - 2 * dotProduct(I, N) * N;
+    return I - 2 * glm::dot(I, N) * N;
 }
 
 // [comment]
@@ -283,7 +246,7 @@ glm::vec3 reflect(const glm::vec3 &I, const glm::vec3 &N)
 // [/comment]
 glm::vec3 refract(const glm::vec3 &I, const glm::vec3 &N, const float &ior)
 {
-    float cosi = clamp(-1, 1, dotProduct(I, N));
+    float cosi = clamp(-1, 1, glm::dot(I, N));
     float etai = 1, etat = ior;
     glm::vec3 n = N;
     if (cosi < 0) { cosi = -cosi; } else { std::swap(etai, etat); n= -N; }
@@ -305,7 +268,7 @@ glm::vec3 refract(const glm::vec3 &I, const glm::vec3 &N, const float &ior)
 // [/comment]
 void fresnel(const glm::vec3 &I, const glm::vec3 &N, const float &ior, float &kr)
 {
-    float cosi = clamp(-1, 1, dotProduct(I, N));
+    float cosi = clamp(-1, 1, glm::dot(I, N));
     float etai = 1, etat = ior;
     if (cosi > 0) {  std::swap(etai, etat); }
     // Compute sini using Snell's law
@@ -409,10 +372,10 @@ glm::vec3 castRay(
             {
                 glm::vec3 reflectionDirection = normalize(reflect(dir, N));
                 glm::vec3 refractionDirection = normalize(refract(dir, N, hitObject->ior));
-                glm::vec3 reflectionRayOrig = (dotProduct(reflectionDirection, N) < 0) ?
+                glm::vec3 reflectionRayOrig = (glm::dot(reflectionDirection, N) < 0) ?
                     hitPoint - N * options.bias :
                     hitPoint + N * options.bias;
-                glm::vec3 refractionRayOrig = (dotProduct(refractionDirection, N) < 0) ?
+                glm::vec3 refractionRayOrig = (glm::dot(refractionDirection, N) < 0) ?
                     hitPoint - N * options.bias :
                     hitPoint + N * options.bias;
                 glm::vec3 reflectionColor = castRay(reflectionRayOrig, reflectionDirection, objects, lights, options, depth + 1, 1);
@@ -427,7 +390,7 @@ glm::vec3 castRay(
                 float kr;
                 fresnel(dir, N, hitObject->ior, kr);
                 glm::vec3 reflectionDirection = reflect(dir, N);
-                glm::vec3 reflectionRayOrig = (dotProduct(reflectionDirection, N) < 0) ?
+                glm::vec3 reflectionRayOrig = (glm::dot(reflectionDirection, N) < 0) ?
                     hitPoint + N * options.bias :
                     hitPoint - N * options.bias;
                 hitColor = castRay(reflectionRayOrig, reflectionDirection, objects, lights, options, depth + 1) * kr;
@@ -440,7 +403,7 @@ glm::vec3 castRay(
                 // is composed of a diffuse and a specular reflection component.
                 // [/comment]
                 glm::vec3 lightAmt = glm::vec3(0,0,0), specularColor =  glm::vec3(0,0,0);
-                glm::vec3 shadowPointOrig = (dotProduct(dir, N) < 0) ?
+                glm::vec3 shadowPointOrig = (glm::dot(dir, N) < 0) ?
                     hitPoint + N * options.bias :
                     hitPoint - N * options.bias;
                 // [comment]
@@ -450,9 +413,9 @@ glm::vec3 castRay(
                 for (uint32_t i = 0; i < lights.size(); ++i) {
                     glm::vec3 lightDir = lights[i]->position - hitPoint;
                     // square of the distance between hitPoint and the light
-                    float lightDistance2 = dotProduct(lightDir, lightDir);
+                    float lightDistance2 = glm::dot(lightDir, lightDir);
                     lightDir = normalize(lightDir);
-                    float LdotN = std::max(0.f, dotProduct(lightDir, N));
+                    float LdotN = std::max(0.f, glm::dot(lightDir, N));
                     Object *shadowHitObject = nullptr;
                     float tNearShadow = kInfinity;
                     // is the point in shadow, and is the nearest occluding object closer to the object than the light itself?
@@ -465,7 +428,7 @@ glm::vec3 castRay(
 
 
                     glm::vec3 reflectionDirection = reflect(-lightDir, N);
-                    specularColor += powf(std::max(0.f, -dotProduct(reflectionDirection, dir)), hitObject->specularExponent) * lights[i]->intensity;
+                    specularColor += powf(std::max(0.f, -glm::dot(reflectionDirection, dir)), hitObject->specularExponent) * lights[i]->intensity;
                 }
                 hitColor = lightAmt * hitObject->evalDiffuseColor(st) * hitObject->Kd + specularColor * hitObject->Ks;
                 break;
