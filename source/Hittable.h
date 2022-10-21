@@ -37,6 +37,8 @@ class Hittable
     float specularExponent;
 };
 
+typedef std::vector<std::unique_ptr<Hittable>> HittableList;
+
 
 
 

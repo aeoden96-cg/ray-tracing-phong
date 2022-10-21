@@ -34,23 +34,83 @@
 #include "MeshTriangle.h"
 #include "Light.h"
 
+#include "yaml-cpp/yaml.h"
+
+HittableList loadSceneFromFile(const std::string& filename) {
+    YAML::Node config = YAML::LoadFile(filename + ".yaml");
+
+    HittableList objects;
+
+    std::map<std::string, MaterialType> materials;
+
+    materials["DIFFUSE_AND_GLOSSY"] = DIFFUSE_AND_GLOSSY;
+    materials["REFLECTION_AND_REFRACTION"] = REFLECTION_AND_REFRACTION;
+    materials["REFLECTION"] = REFLECTION;
+    materials["METAL"] = METAL;
+
+
+
+
+    for (auto object : config["objects"]) {
+        auto type = object["type"].as<std::string>();
+        auto material_name = object["material"].as<std::string>();
+        auto material = materials[material_name];
+
+        if(type == "sphere") {
+            auto center_v = object["center"].as<std::vector<float>>();
+            auto radius = object["radius"].as<float>();
+            auto color = object["color"].as<std::vector<float>>();
+            Sphere s(glm::vec3(center_v[0], center_v[1], center_v[2]), radius);
+            s.materialType = material;
+            s.diffuseColor = glm::vec3(color[0], color[1], color[2]);
+            objects.push_back(std::make_unique<Sphere>(s));
+        } else if(type == "plane") {
+            auto up_left_v = object["up_left"].as<std::vector<float>>();
+            auto up_right_v = object["up_right"].as<std::vector<float>>();
+            auto down_left_v = object["down_left"].as<std::vector<float>>();
+            auto down_right_v = object["down_right"].as<std::vector<float>>();
+            auto material_name = object["material"].as<std::string>();
+            auto material = materials[material_name];
+
+            std::vector<glm::vec3> vertices;
+            vertices.push_back(glm::vec3(up_left_v[0], up_left_v[1], up_left_v[2]));
+            vertices.push_back(glm::vec3(up_right_v[0], up_right_v[1], up_right_v[2]));
+            vertices.push_back(glm::vec3(down_right_v[0], down_right_v[1], down_right_v[2]));
+            vertices.push_back(glm::vec3(down_left_v[0], down_left_v[1], down_left_v[2]));
+
+            std::vector<glm::uvec3> vertIndices;
+            vertIndices.push_back(glm::uvec3(0, 1, 3));
+            vertIndices.push_back(glm::uvec3(1, 2, 3));
+
+            std::vector<glm::uvec2> uvIndices;
+            uvIndices.push_back(glm::uvec2(0, 0));
+            uvIndices.push_back(glm::uvec2(1, 0));
+            uvIndices.push_back(glm::uvec2(1, 1));
+            uvIndices.push_back(glm::uvec2(0, 1));
+
+
+
+            MeshTriangle *mesh = new MeshTriangle(vertices, vertIndices, uvIndices);
+    
+            objects.push_back(std::unique_ptr<MeshTriangle>(mesh));
+        } else {
+            throw std::runtime_error("Unknown object type");
+        }
+    }
+
+    return objects;
+}
+
+
 
 // Returns true if the ray intersects an Hittable, false otherwise.
-//
 // \param orig is the ray origin
-//
 // \param dir is the ray direction
-//
 // \param objects is the list of objects the scene contains
-//
 // \param[out] tNear contains the distance to the cloesest intersected Hittable.
-//
 // \param[out] index stores the index of the intersect triangle if the interesected Hittable is a mesh.
-//
 // \param[out] uv stores the u and v barycentric coordinates of the intersected point
-//
 // \param[out] *hitObject stores the pointer to the intersected Hittable (used to retrieve material information, etc.)
-//
 // \param isShadowRay is it a shadow ray. We can return from the function sooner as soon as we have found a hit.
 bool trace(
     const glm::vec3 &orig, const glm::vec3 &dir,
@@ -106,6 +166,15 @@ glm::vec3 getReflectionColor (
         lights, 
         options, 
         depth + 1);
+}
+
+glm::vec3 randomInUnitSphere()
+{
+    glm::vec3 p;
+    do {
+        p = 2.0f * glm::vec3(drand48(), drand48(), drand48()) - glm::vec3(1, 1, 1);
+    } while (glm::dot(p, p) >= 1.0);
+    return p;
 }
 
 glm::vec3 getRefractionColor (
@@ -195,6 +264,22 @@ glm::vec3 castRay(
                 hitColor = reflectionColor * kr;
                 break;
             }
+            case METAL:
+            {
+                float roughness = 0.1f;
+                float kr = fresnel(dir, N, rec.object->ior);
+                                
+                glm::vec3 reflectionColor = getReflectionColor(
+                    rec,
+                    dir + roughness * randomInUnitSphere(),
+                    options,
+                    depth,
+                    objects,
+                    lights);
+                
+                hitColor = reflectionColor * kr;
+                break;
+            }
             default:
             {
                 // We use the Phong illumation model int the default case. The phong model
@@ -209,20 +294,17 @@ glm::vec3 castRay(
                 // We also apply the lambert cosine law here though we haven't explained yet what this means.
                 for (const auto &light : lights) {
                     glm::vec3 lightDir = light->position - hitPoint;
-                    // square of the distance between hitPoint and the light
-                    float lightDistance2 = glm::dot(lightDir, lightDir);
                     lightDir = normalize(lightDir);
                     float LdotN = std::max(0.f, glm::dot(lightDir, N));
                     //Hittable *shadowHitObject = nullptr;
                     hit_record shadowRec;
                     // is the point in shadow, and is the nearest occluding Hittable closer to the Hittable than the light itself?
                     bool inShadow = trace(shadowPointOrig, lightDir, objects, shadowRec) &&
-                        shadowRec.t * shadowRec.t < lightDistance2;
+                        shadowRec.t * shadowRec.t < glm::dot(lightDir, lightDir);
 
                     if(!inShadow) {
                        lightAmt += light->intensity * LdotN;
                     }
-
 
                     glm::vec3 reflectionDirection = reflect(-lightDir, N);
                     specularColor += powf(std::max(0.f, -glm::dot(reflectionDirection, dir)), rec.object->specularExponent) * light->intensity;
@@ -282,42 +364,37 @@ void render(
 // depth, field-of-view, etc.). We then call the render function().
 int main(int argc, char **argv)
 {
+
+
+
+
+    YAML::Node config = YAML::LoadFile("config.yaml");
+    
     // creating the scene (adding objects and lights)
     std::vector<std::unique_ptr<Hittable>> objects;
     std::vector<std::unique_ptr<Light>> lights;
 
-    Sphere *sph1 = new Sphere(glm::vec3(-1, 0, -12), 2);
-    sph1->materialType = DIFFUSE_AND_GLOSSY;
-    sph1->diffuseColor = glm::vec3(0.6, 0.7, 0.8);
-    Sphere *sph2 = new Sphere(glm::vec3(0.5, -0.5, -8), 1.5);
-    sph2->ior = 1.5;
-    sph2->materialType = REFLECTION_AND_REFRACTION;
+    auto fileName = config["scene"].as<std::string>();
 
-    objects.push_back(std::unique_ptr<Sphere>(sph1));
-    objects.push_back(std::unique_ptr<Sphere>(sph2));
+    YAML::Node input = YAML::LoadFile(fileName + ".yaml");
 
-    glm::vec3 verts[4] = {{-5,-3,-6}, {5,-3,-6}, {5,-3,-16}, {-5,-3,-16}};
-    uint32_t vertIndex[6] = {0, 1, 3, 1, 2, 3};
-    glm::vec2 st[4] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
-    MeshTriangle *mesh = new MeshTriangle(verts, vertIndex, 2, st);
-    mesh->materialType = DIFFUSE_AND_GLOSSY;
-    
-    objects.push_back(std::unique_ptr<MeshTriangle>(mesh));
-
-    lights.push_back(std::unique_ptr<Light>(new Light(glm::vec3(-20, 70, 20), glm::vec3(0.5f, 0.5f, 0.5f))));
-    lights.push_back(std::unique_ptr<Light>(new Light(glm::vec3(30, 50, -12), glm::vec3(1, 1, 1))));
-    
+    objects = loadSceneFromFile(fileName);
+   
+    lights.push_back(std::unique_ptr<Light>(new Light(glm::vec3(0,4,-11), glm::vec3(1,1,1))));
+    lights.push_back(std::unique_ptr<Light>(new Light(glm::vec3(0,0,5), glm::vec3(1,1,1))));
     // setting up options
     Options options;
-    options.width = 640;
-    options.height = 480;
-    options.fov = 90;
+    options.width = 600;
+    options.height = 600;
+    options.fov = 80;
     options.backgroundColor = glm::vec3(0.235294, 0.67451, 0.843137);
     options.maxDepth = 5;
     options.bias = 0.00001;
     
     // finally, render
     render(options, objects, lights);
+
+    
 
     return 0;
 }

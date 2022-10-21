@@ -1,0 +1,57 @@
+objects:
+- type: sphere
+  center: [0, -2.1, -10]
+  radius: 3
+  color: [0.5, 0.5, 0.5]
+  material: "REFLECTION_AND_REFRACTION"
+
+- type: sphere
+  center: [2, -1, -12]
+  radius: 3
+  color: [0.5, 0.5, 0.5]
+  material: "METAL"
+
+  #floor
+- type: plane
+  up_left: [-5, -5, -6]
+  up_right: [5,-5,-6]
+  down_right: [5,-5,-16]
+  down_left: [-5,-5,-16]
+  material: "DIFFUSE_AND_GLOSSY"
+
+  #back wall
+- type: plane
+  up_left: [-5, -5, -16]
+  up_right: [5,-5,-16]
+  down_right: [5,5,-16]
+  down_left: [-5,5,-16]
+  material: "DIFFUSE_AND_GLOSSY"
+
+  #left wall
+- type: plane
+  up_left: [-5, -5, -6]
+  up_right: [-5,-5,-16]
+  down_right: [-5,5,-16]
+  down_left: [-5,5,-6]
+  material: "DIFFUSE_AND_GLOSSY"
+
+  #right wall
+- type: plane
+  up_left: [5, -5, -6]
+  up_right: [5, 5,-6]
+  down_right: [5,5,-16]
+  down_left: [5,-5,-16]
+  material: "DIFFUSE_AND_GLOSSY"
+
+  #ceiling
+- type: plane
+  up_left: [-5, 5, -6]
+  up_right: [-5,5,-16]
+  down_right: [5,5,-16]
+  down_left: [5,5,-6]
+
+  material: "DIFFUSE_AND_GLOSSY"
+
+
+
+
