@@ -15,6 +15,9 @@ ADD_EXECUTABLE(PROJECT
         source/MeshTriangle.cpp
         source/Light.h
         source/Light.cpp
+        source/TriangleMesh.h
+        source/TriangleMesh.cpp
+        source/teapotdata.h
 )
 
 target_link_libraries(

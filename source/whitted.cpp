@@ -33,6 +33,8 @@
 #include "Sphere.h"
 #include "MeshTriangle.h"
 #include "Light.h"
+#include "TriangleMesh.h"
+#include "teapotdata.h"
 
 #include "yaml-cpp/yaml.h"
 
@@ -362,6 +364,107 @@ void render(
 // In the main function of the program, we create the scene (create objects and lights)
 // as well as set the options for the render (image widht and height, maximum recursion
 // depth, field-of-view, etc.). We then call the render function().
+
+glm::vec3 evalBezierCurve(const std::vector<glm::vec3> & P, const float &t) 
+{ 
+    float b0 = (1 - t) * (1 - t) * (1 - t); 
+    float b1 = 3 * t * (1 - t) * (1 - t); 
+    float b2 = 3 * t * t * (1 - t); 
+    float b3 = t * t * t; 
+ 
+    return P[0] * b0 + P[1] * b1 + P[2] * b2 + P[3] * b3; 
+} 
+ 
+glm::vec3 evalBezierPatch(const std::vector<glm::vec3> controlPoints, const float &u, const float &v) 
+{ 
+    std::vector<glm::vec3> uCurve; 
+    for (int i = 0; i < 4; ++i){
+        uCurve[i] = evalBezierCurve({controlPoints[i * 4 + 0], controlPoints[i * 4 + 1], controlPoints[i * 4 + 2], controlPoints[i * 4 + 3]}, u);
+    }
+        
+    return evalBezierCurve(uCurve, v); 
+} 
+ 
+glm::vec3 derivBezier(const std::vector<glm::vec3>& P, const float &t) 
+{ 
+    return -3 * (1 - t) * (1 - t) * P[0] + 
+        (3 * (1 - t) * (1 - t) - 6 * t * (1 - t)) * P[1] + 
+        (6 * t * (1 - t) - 3 * t * t) * P[2] + 
+        3 * t * t * P[3]; 
+} 
+
+glm::vec3 dUBezier(const std::vector<glm::vec3>& controlPoints, const float &u, const float &v) 
+{ 
+    std::vector<glm::vec3> P; 
+    std::vector<glm::vec3> vCurve; 
+    for (int i = 0; i < 4; ++i) { 
+        P[0] = controlPoints[i]; 
+        P[1] = controlPoints[4 + i]; 
+        P[2] = controlPoints[8 + i]; 
+        P[3] = controlPoints[12 + i]; 
+        vCurve[i] = evalBezierCurve(P, v); 
+    } 
+ 
+    return derivBezier(vCurve, u); 
+} 
+
+glm::vec3 dVBezier(const  std::vector<glm::vec3>& controlPoints, const float &u, const float &v) 
+{ 
+    std::vector<glm::vec3> uCurve; 
+    for (int i = 0; i < 4; ++i) { 
+        uCurve[i] = evalBezierCurve({controlPoints[i * 4 + 0], controlPoints[i * 4 + 1], controlPoints[i * 4 + 2], controlPoints[i * 4 + 3]}, u);
+    } 
+ 
+    return derivBezier(uCurve, v); 
+} 
+
+void createPolyTeapot(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable>> &objects) 
+{ 
+    uint32_t divs = 8; 
+    std::unique_ptr<std::vector<glm::vec3>> P(new std::vector<glm::vec3>);
+    std::unique_ptr<std::vector<uint32_t>> nvertices(new std::vector<uint32_t>);
+    std::unique_ptr<std::vector<uint32_t>> vertices(new std::vector<uint32_t>);
+    std::unique_ptr<std::vector<glm::vec3>> N(new std::vector<glm::vec3>);
+    std::unique_ptr<std::vector<glm::vec2>> st(new std::vector<glm::vec2>);
+ 
+    // face connectivity - all patches are subdivided the same way so there
+    // share the same topology and uvs
+    for (uint16_t j = 0, k = 0; j < divs; ++j) { 
+        for (uint16_t i = 0; i < divs; ++i, ++k) { 
+            nvertices->insert(nvertices->begin() + k, 4);
+            vertices->insert(vertices->begin() + k* 4, (divs + 1) * j + i);
+            vertices->insert(vertices->begin() + k * 4 + 1, (divs + 1) * j + i + 1);
+            vertices->insert(vertices->begin() + k * 4 + 2, (divs + 1) * (j + 1) + i + 1);
+            vertices->insert(vertices->begin() + k * 4 + 3, (divs + 1) * (j + 1) + i);
+        } 
+    } 
+ 
+    std::vector<glm::vec3> controlPoints; 
+    for (int np = 0; np < kTeapotNumPatches; ++np) {  //kTeapotNumPatches 
+        // set the control points for the current patch
+        for (uint32_t i = 0; i < 16; ++i) 
+            controlPoints[i][0] = teapotVertices[teapotPatches[np][i] - 1][0], 
+            controlPoints[i][1] = teapotVertices[teapotPatches[np][i] - 1][1], 
+            controlPoints[i][2] = teapotVertices[teapotPatches[np][i] - 1][2]; 
+ 
+        // generate grid
+        for (uint16_t j = 0, k = 0; j <= divs; ++j) { 
+            float v = j / (float)divs; 
+            for (uint16_t i = 0; i <= divs; ++i, ++k) { 
+                float u = i / (float)divs; 
+                P->insert(P->begin() + k, evalBezierPatch(controlPoints, u, v));
+                glm::vec3 dU = dUBezier(controlPoints, u, v); 
+                glm::vec3 dV = dVBezier(controlPoints, u, v); 
+                N->insert(N->begin() + k, glm::normalize(glm::cross(dU, dV)));
+                st->insert(st->begin() + k, glm::vec2(u, v));
+            } 
+        } 
+ 
+        objects.push_back(std::make_unique<TriangleMesh>(o2w, std::move(P), std::move(nvertices), std::move(vertices), std::move(N), std::move(st)));
+            {o2w, divs * divs, nvertices, vertices, P, N, st}));
+    } 
+} 
+
 int main(int argc, char **argv)
 {
 

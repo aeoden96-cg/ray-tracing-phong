@@ -35,6 +35,10 @@ class Hittable
     float Kd, Ks;
     glm::vec3 diffuseColor;
     float specularExponent;
+    glm::mat4 objectToWorld, worldToObject;
+
+    Hittable(const glm::mat4 o2w): objectToWorld(o2w), worldToObject(glm::inverse(o2w)){} 
+    
 };
 
 typedef std::vector<std::unique_ptr<Hittable>> HittableList;
