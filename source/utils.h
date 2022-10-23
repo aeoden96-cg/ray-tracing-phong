@@ -36,6 +36,7 @@ struct Options
     uint32_t height;
     float fov;
     float imageAspectRatio;
+    glm::mat4 cameraToWorld;
     uint8_t maxDepth;
     glm::vec3 backgroundColor;
     float bias;
@@ -80,5 +81,24 @@ glm::vec3 refract(const glm::vec3 &I, const glm::vec3 &N, const float &ior);
 //
 // \param[out] kr is the amount of light reflected
 float fresnel(const glm::vec3 &I, const glm::vec3 &N, const float &ior);
+
+void multVecMatrix(const glm::vec3 &src, glm::vec3 &dst,glm::mat4& x);
+
+void multDirMatrix(const glm::vec3 &src, glm::vec3 &dst,glm::mat4& x);
+
+// Compute the position of a point along a Bezier curve at t [0:1]
+glm::vec3 evalBezierCurve(const glm::vec3 *P, const float &t);
+
+glm::vec3 evalBezierPatch(const glm::vec3 *controlPoints, const float &u, const float &v);
+glm::vec3 derivBezier(const glm::vec3 *P, const float &t);
+
+// Compute the derivative of a point on Bezier patch along the u parametric direction
+glm::vec3 dUBezier(const glm::vec3 *controlPoints, const float &u, const float &v);
+
+// Compute the derivative of a point on Bezier patch along the v parametric direction
+glm::vec3 dVBezier(const glm::vec3 *controlPoints, const float &u, const float &v);
+
+
+
 
 #endif // UTILS_H

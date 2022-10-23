@@ -13,10 +13,10 @@ ADD_EXECUTABLE(PROJECT
         source/Sphere.cpp
         source/MeshTriangle.h
         source/MeshTriangle.cpp
+        source/PatchMesh.cpp
+        source/PatchMesh.h
         source/Light.h
         source/Light.cpp
-        source/TriangleMesh.h
-        source/TriangleMesh.cpp
         source/teapotdata.h
 )
 

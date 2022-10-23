@@ -102,3 +102,87 @@ float fresnel(const glm::vec3 &I, const glm::vec3 &N, const float &ior)
     // kt = 1 - kr;
     return kr;
 }
+
+
+
+glm::vec3 evalBezierCurve(const glm::vec3 *P, const float &t)
+{
+    float b0 = (1 - t) * (1 - t) * (1 - t);
+    float b1 = 3 * t * (1 - t) * (1 - t);
+    float b2 = 3 * t * t * (1 - t);
+    float b3 = t * t * t;
+
+    return P[0] * b0 + P[1] * b1 + P[2] * b2 + P[3] * b3;
+}
+
+glm::vec3 dVBezier(const glm::vec3 *controlPoints, const float &u, const float &v)
+{
+    glm::vec3 uCurve[4];
+    for (int i = 0; i < 4; ++i) {
+        uCurve[i] = evalBezierCurve(controlPoints + 4 * i, u);
+    }
+
+    return derivBezier(uCurve, v);
+}
+
+glm::vec3 derivBezier(const glm::vec3 *P, const float &t)
+{
+    return -3 * (1 - t) * (1 - t) * P[0] +
+           (3 * (1 - t) * (1 - t) - 6 * t * (1 - t)) * P[1] +
+           (6 * t * (1 - t) - 3 * t * t) * P[2] +
+           3 * t * t * P[3];
+}
+
+void multDirMatrix(const glm::vec3 &src, glm::vec3 &dst,glm::mat4& x)
+{
+    float a, b, c;
+
+    a = src[0] * x[0][0] + src[1] * x[1][0] + src[2] * x[2][0];
+    b = src[0] * x[0][1] + src[1] * x[1][1] + src[2] * x[2][1];
+    c = src[0] * x[0][2] + src[1] * x[1][2] + src[2] * x[2][2];
+
+    dst.x = a;
+    dst.y = b;
+    dst.z = c;
+}
+
+void multVecMatrix(const glm::vec3 &src, glm::vec3 &dst,glm::mat4& x)
+{
+    float a, b, c, w;
+
+    a = src[0] * x[0][0] + src[1] * x[1][0] + src[2] * x[2][0] + x[3][0];
+    b = src[0] * x[0][1] + src[1] * x[1][1] + src[2] * x[2][1] + x[3][1];
+    c = src[0] * x[0][2] + src[1] * x[1][2] + src[2] * x[2][2] + x[3][2];
+    w = src[0] * x[0][3] + src[1] * x[1][3] + src[2] * x[2][3] + x[3][3];
+
+    dst.x = a / w;
+    dst.y = b / w;
+    dst.z = c / w;
+}
+
+
+
+glm::vec3 evalBezierPatch(const glm::vec3 *controlPoints, const float &u, const float &v)
+{
+    glm::vec3 uCurve[4];
+    for (int i = 0; i < 4; ++i)
+        uCurve[i] = evalBezierCurve(controlPoints + 4 * i, u);
+
+    return evalBezierCurve(uCurve, v);
+}
+
+
+glm::vec3 dUBezier(const glm::vec3 *controlPoints, const float &u, const float &v)
+{
+    glm::vec3 P[4];
+    glm::vec3 vCurve[4];
+    for (int i = 0; i < 4; ++i) {
+        P[0] = controlPoints[i];
+        P[1] = controlPoints[4 + i];
+        P[2] = controlPoints[8 + i];
+        P[3] = controlPoints[12 + i];
+        vCurve[i] = evalBezierCurve(P, v);
+    }
+
+    return derivBezier(vCurve, u);
+}

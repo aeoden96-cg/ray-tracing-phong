@@ -33,10 +33,10 @@
 #include "Sphere.h"
 #include "MeshTriangle.h"
 #include "Light.h"
-#include "TriangleMesh.h"
 #include "teapotdata.h"
 
 #include "yaml-cpp/yaml.h"
+#include "PatchMesh.h"
 
 HittableList loadSceneFromFile(const std::string& filename) {
     YAML::Node config = YAML::LoadFile(filename + ".yaml");
@@ -123,7 +123,13 @@ bool trace(
         float tNearK = kInfinity;
         uint32_t indexK;
         glm::vec2 uvK;
-        if (object->intersect(orig, dir, tNearK, indexK, uvK, rec) && tNearK < rec.t) {
+        if (object->intersect(
+                orig,
+                dir,
+                tNearK,
+                indexK,
+                uvK,
+                rec) && tNearK < rec.t) {
             rec.t = tNearK;
             rec.triIndex = indexK;
             rec.uv = uvK;
@@ -239,7 +245,11 @@ glm::vec3 castRay(
         glm::vec2 st = rec.st;
         glm::vec3 hitPoint = rec.p;
         float tnear = rec.t;
-        
+
+
+//        float s = std::max(0.0f, - glm::dot(rec.normal,dir));
+//        hitColor = {s,s,s}; //* glm::vec3(hitTexCoordinates.x, hitTexCoordinates.y, 1);
+//
 
         switch (rec.object->materialType) {
             case REFLECTION_AND_REFRACTION:
@@ -251,18 +261,18 @@ glm::vec3 castRay(
 
                 glm::vec3 refractionColor = getRefractionColor(
                     rec, dir, options, depth, objects, lights);
-                
-                
+
+
                 hitColor = reflectionColor * kr + refractionColor * (1 - kr);
                 break;
             }
             case REFLECTION:
             {
                 float kr = fresnel(dir, N, rec.object->ior);
-                
+
                 glm::vec3 reflectionColor = getReflectionColor(
                     rec, dir, options, depth, objects, lights);
-                
+
                 hitColor = reflectionColor * kr;
                 break;
             }
@@ -270,7 +280,7 @@ glm::vec3 castRay(
             {
                 float roughness = 0.1f;
                 float kr = fresnel(dir, N, rec.object->ior);
-                                
+
                 glm::vec3 reflectionColor = getReflectionColor(
                     rec,
                     dir + roughness * randomInUnitSphere(),
@@ -278,7 +288,7 @@ glm::vec3 castRay(
                     depth,
                     objects,
                     lights);
-                
+
                 hitColor = reflectionColor * kr;
                 break;
             }
@@ -326,23 +336,28 @@ glm::vec3 castRay(
 // saved to a file.
 // [/comment]
 void render(
-    const Options &options,
+        Options &options,
     const std::vector<std::unique_ptr<Hittable>> &objects,
     const std::vector<std::unique_ptr<Light>> &lights)
 {
+    glm::vec3 orig(0);
+    multVecMatrix(glm::vec3(0), orig,options.cameraToWorld);
     glm::vec3 *framebuffer = new glm::vec3[options.width * options.height];
     glm::vec3 *pix = framebuffer;
     float scale = tan(glm::radians(options.fov * 0.5));
     float imageAspectRatio = options.width / (float)options.height;
-    glm::vec3 orig(0);
     for (uint32_t j = 0; j < options.height; ++j) {
         for (uint32_t i = 0; i < options.width; ++i) {
             // generate primary ray direction
             float x = (2 * (i + 0.5) / (float)options.width - 1) * imageAspectRatio * scale;
             float y = (1 - 2 * (j + 0.5) / (float)options.height) * scale;
-            glm::vec3 dir = normalize(glm::vec3(x, y, -1));
+//            glm::vec3 dir = normalize(glm::vec3(x, y, -1));
+            glm::vec3 dir;
+            multDirMatrix(glm::vec3(x, y, -1), dir,options.cameraToWorld);
+            dir = glm::normalize(dir);
             *(pix++) = castRay(orig, dir, objects, lights, options, 0);
         }
+        std::cout << "\rRendering (" << 1 << " spp) " << 100.f * j / (options.height - 1) << "%" << std::flush;
     }
 
     // save framebuffer to file
@@ -416,61 +431,57 @@ glm::vec3 dVBezier(const  std::vector<glm::vec3>& controlPoints, const float &u,
     } 
  
     return derivBezier(uCurve, v); 
-} 
+}
 
-void createPolyTeapot(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable>> &objects) 
-{ 
-    uint32_t divs = 8; 
-    std::unique_ptr<std::vector<glm::vec3>> P(new std::vector<glm::vec3>);
-    std::unique_ptr<std::vector<uint32_t>> nvertices(new std::vector<uint32_t>);
-    std::unique_ptr<std::vector<uint32_t>> vertices(new std::vector<uint32_t>);
-    std::unique_ptr<std::vector<glm::vec3>> N(new std::vector<glm::vec3>);
-    std::unique_ptr<std::vector<glm::vec2>> st(new std::vector<glm::vec2>);
- 
+void createPolyTeapot(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable>> &objects)
+{
+    uint32_t divs = 8;
+    std::unique_ptr<glm::vec3 []> P(new glm::vec3[(divs + 1) * (divs + 1)]);
+    std::unique_ptr<uint32_t []> nvertices(new uint32_t[divs * divs]);
+    std::unique_ptr<uint32_t []> vertices(new uint32_t[divs * divs * 4]);
+    std::unique_ptr<glm::vec3 []> N(new glm::vec3[(divs + 1) * (divs + 1)]);
+    std::unique_ptr<glm::vec2 []> st(new glm::vec2[(divs + 1) * (divs + 1)]);
+
     // face connectivity - all patches are subdivided the same way so there
     // share the same topology and uvs
-    for (uint16_t j = 0, k = 0; j < divs; ++j) { 
-        for (uint16_t i = 0; i < divs; ++i, ++k) { 
-            nvertices->insert(nvertices->begin() + k, 4);
-            vertices->insert(vertices->begin() + k* 4, (divs + 1) * j + i);
-            vertices->insert(vertices->begin() + k * 4 + 1, (divs + 1) * j + i + 1);
-            vertices->insert(vertices->begin() + k * 4 + 2, (divs + 1) * (j + 1) + i + 1);
-            vertices->insert(vertices->begin() + k * 4 + 3, (divs + 1) * (j + 1) + i);
-        } 
-    } 
- 
-    std::vector<glm::vec3> controlPoints; 
-    for (int np = 0; np < kTeapotNumPatches; ++np) {  //kTeapotNumPatches 
+    for (uint16_t j = 0, k = 0; j < divs; ++j) {
+        for (uint16_t i = 0; i < divs; ++i, ++k) {
+            nvertices[k] = 4;
+            vertices[k * 4    ] = (divs + 1) * j + i;
+            vertices[k * 4 + 1] = (divs + 1) * j + i + 1;
+            vertices[k * 4 + 2] = (divs + 1) * (j + 1) + i + 1;
+            vertices[k * 4 + 3] = (divs + 1) * (j + 1) + i;
+        }
+    }
+
+    glm::vec3 controlPoints[16];
+    for (int np = 0; np < kTeapotNumPatches; ++np) { // kTeapotNumPatches
         // set the control points for the current patch
-        for (uint32_t i = 0; i < 16; ++i) 
-            controlPoints[i][0] = teapotVertices[teapotPatches[np][i] - 1][0], 
-            controlPoints[i][1] = teapotVertices[teapotPatches[np][i] - 1][1], 
-            controlPoints[i][2] = teapotVertices[teapotPatches[np][i] - 1][2]; 
- 
+        for (uint32_t i = 0; i < 16; ++i)
+            controlPoints[i][0] = teapotVertices[teapotPatches[np][i] - 1][0],
+            controlPoints[i][1] = teapotVertices[teapotPatches[np][i] - 1][1],
+            controlPoints[i][2] = teapotVertices[teapotPatches[np][i] - 1][2];
+
         // generate grid
-        for (uint16_t j = 0, k = 0; j <= divs; ++j) { 
-            float v = j / (float)divs; 
-            for (uint16_t i = 0; i <= divs; ++i, ++k) { 
-                float u = i / (float)divs; 
-                P->insert(P->begin() + k, evalBezierPatch(controlPoints, u, v));
-                glm::vec3 dU = dUBezier(controlPoints, u, v); 
-                glm::vec3 dV = dVBezier(controlPoints, u, v); 
-                N->insert(N->begin() + k, glm::normalize(glm::cross(dU, dV)));
-                st->insert(st->begin() + k, glm::vec2(u, v));
-            } 
-        } 
- 
-        objects.push_back(std::make_unique<TriangleMesh>(o2w, std::move(P), std::move(nvertices), std::move(vertices), std::move(N), std::move(st)));
-            {o2w, divs * divs, nvertices, vertices, P, N, st}));
-    } 
-} 
+        for (uint16_t j = 0, k = 0; j <= divs; ++j) {
+            float v = j / (float)divs;
+            for (uint16_t i = 0; i <= divs; ++i, ++k) {
+                float u = i / (float)divs;
+                P[k] = evalBezierPatch(controlPoints, u, v);
+                glm::vec3 dU = dUBezier(controlPoints, u, v);
+                glm::vec3 dV = dVBezier(controlPoints, u, v);
+                N[k] = glm::normalize(glm::cross(dU,dV));
+                st[k].x = u;
+                st[k].y = v;
+            }
+        }
+
+        objects.push_back(std::unique_ptr<PatchMesh>(new PatchMesh(o2w, divs * divs, nvertices, vertices, P, N, st)));
+    }
+}
 
 int main(int argc, char **argv)
 {
-
-
-
-
     YAML::Node config = YAML::LoadFile("config.yaml");
     
     // creating the scene (adding objects and lights)
@@ -482,18 +493,43 @@ int main(int argc, char **argv)
     YAML::Node input = YAML::LoadFile(fileName + ".yaml");
 
     objects = loadSceneFromFile(fileName);
-   
+
+
+    //o2w is the object to world transformation
+    //it is the transformation that transforms the object from its local space to the world space
+    //in this case, the object is the teapot, and the world is the scene
+    //the teapot is centered at the origin, so we need to translate it to the position we want
+    //to translate it to the position (0, 0, 0), we need to translate it by (-0.5, -0.5, -0.5)
+    glm::mat4 o2w = glm::translate(glm::mat4(1.0f), glm::vec3(-1 ,-3, -5));
+    //to rotate it, we need to rotate it by 90 degrees around the x axis
+    o2w = glm::rotate(o2w, glm::radians(-90.0f), glm::vec3(1, 0, 0));
+    //to scale it, we need to scale it by 0.5
+    o2w = glm::scale(o2w, glm::vec3(0.7, 0.7, 0.7));
+
+
+    createPolyTeapot(o2w, objects);
+
+    std::cout << "Created poly teapot" << std::endl;
+
+
     lights.push_back(std::unique_ptr<Light>(new Light(glm::vec3(0,4,-11), glm::vec3(1,1,1))));
     lights.push_back(std::unique_ptr<Light>(new Light(glm::vec3(0,0,5), glm::vec3(1,1,1))));
+
     // setting up options
     Options options;
-    options.width = 600;
-    options.height = 600;
+    options.width = 80;
+    options.height = 80;
     options.fov = 80;
     options.backgroundColor = glm::vec3(0.235294, 0.67451, 0.843137);
-    options.maxDepth = 5;
+    options.maxDepth = 4;
     options.bias = 0.00001;
-    
+    //cameraToWorld is the inverse of the camera matrix
+    //it is the matrix that transforms from world space to camera space
+    //we create it by rotating around the y axis by 180 degrees and then translating by (0,0,5)
+    options.cameraToWorld = glm::mat4(1.0f);
+    //options.cameraToWorld = glm::translate(options.cameraToWorld, glm::vec3(0,1,5));
+    //options.cameraToWorld = glm::rotate(options.cameraToWorld, glm::radians(50.0f), glm::vec3(0,1,0));
+
     // finally, render
     render(options, objects, lights);
 
