@@ -36,7 +36,7 @@
 #include "teapotdata.h"
 
 #include "yaml-cpp/yaml.h"
-#include "PatchMesh.h"
+//#include "PatchMesh.h"
 
 HittableList loadSceneFromFile(const std::string& filename) {
     YAML::Node config = YAML::LoadFile(filename + ".yaml");
@@ -90,11 +90,12 @@ HittableList loadSceneFromFile(const std::string& filename) {
             uvIndices.push_back(glm::uvec2(1, 1));
             uvIndices.push_back(glm::uvec2(0, 1));
 
-
-
-            MeshTriangle *mesh = new MeshTriangle(vertices, vertIndices, uvIndices);
     
-            objects.push_back(std::unique_ptr<MeshTriangle>(mesh));
+            objects.push_back(std::make_unique<MeshTriangle>(
+                    vertices, vertIndices, uvIndices));
+
+
+
         } else {
             throw std::runtime_error("Unknown object type");
         }
@@ -138,7 +139,6 @@ bool trace(
             rec.uv = uvK;
             rec.triIndex = indexK;
             rec.object = object.get();
-            rec.object->getSurfaceProperties(dir, rec);
         }
     }
 
@@ -238,18 +238,13 @@ glm::vec3 castRay(
     hit_record rec;
     
     if (trace(orig, dir, objects, rec)) {
+
+        rec.object->getSurfaceProperties(dir, rec);
         
         glm::vec2 uv = rec.uv;
-        uint32_t index = rec.triIndex;
         glm::vec3 N = rec.normal;
         glm::vec2 st = rec.st;
         glm::vec3 hitPoint = rec.p;
-        float tnear = rec.t;
-
-
-//        float s = std::max(0.0f, - glm::dot(rec.normal,dir));
-//        hitColor = {s,s,s}; //* glm::vec3(hitTexCoordinates.x, hitTexCoordinates.y, 1);
-//
 
         switch (rec.object->materialType) {
             case REFLECTION_AND_REFRACTION:
@@ -294,6 +289,7 @@ glm::vec3 castRay(
             }
             default:
             {
+
                 // We use the Phong illumation model int the default case. The phong model
                 // is composed of a diffuse and a specular reflection component.
 
@@ -346,6 +342,7 @@ void render(
     glm::vec3 *pix = framebuffer;
     float scale = tan(glm::radians(options.fov * 0.5));
     float imageAspectRatio = options.width / (float)options.height;
+
     for (uint32_t j = 0; j < options.height; ++j) {
         for (uint32_t i = 0; i < options.width; ++i) {
             // generate primary ray direction
@@ -436,49 +433,95 @@ glm::vec3 dVBezier(const  std::vector<glm::vec3>& controlPoints, const float &u,
 void createPolyTeapot(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable>> &objects)
 {
     uint32_t divs = 8;
-    std::unique_ptr<glm::vec3 []> P(new glm::vec3[(divs + 1) * (divs + 1)]);
-    std::unique_ptr<uint32_t []> nvertices(new uint32_t[divs * divs]);
-    std::unique_ptr<uint32_t []> vertices(new uint32_t[divs * divs * 4]);
-    std::unique_ptr<glm::vec3 []> N(new glm::vec3[(divs + 1) * (divs + 1)]);
-    std::unique_ptr<glm::vec2 []> st(new glm::vec2[(divs + 1) * (divs + 1)]);
+
+    typedef std::vector<glm::vec3> PointList;
+//    typedef std::vector<PointList> PatchList;
+    typedef std::vector<unsigned > IndexList;
+    typedef std::vector<glm::uvec2> TexSTList;
+
+
+//    PointList verts((divs + 1) * (divs + 1));
+//    IndexList faceIndices(divs * divs);
+//    IndexList vertIndices(divs * divs * 4);
+//    PointList normals((divs + 1) * (divs + 1));
+//    TexSTList st((divs + 1) * (divs + 1));
+
+    std::unique_ptr<PointList> verts = std::make_unique<PointList>((divs + 1) * (divs + 1));
+    std::unique_ptr<IndexList> faceIndices = std::make_unique<IndexList>(divs * divs);
+    std::unique_ptr<IndexList> vertIndices = std::make_unique<IndexList>(divs * divs * 4);
+    std::unique_ptr<PointList> normals = std::make_unique<PointList>((divs + 1) * (divs + 1));
+    std::unique_ptr<TexSTList> st = std::make_unique<TexSTList>((divs + 1) * (divs + 1));
+
+
+
+
+
+
+//    std::unique_ptr<glm::vec3 []> verts(new glm::vec3 [(divs + 1) * (divs + 1)]);
+//    std::unique_ptr<uint32_t []> faceIndices(new uint32_t[divs * divs]);
+//    std::unique_ptr<uint32_t []> vertIndices(new uint32_t[divs * divs * 4]);
+//    std::unique_ptr<glm::vec3  []> normals(new glm::vec3 [(divs + 1) * (divs + 1)]);
+//    std::unique_ptr<glm::vec2 []> st(new glm::vec2[(divs + 1) * (divs + 1)]);
 
     // face connectivity - all patches are subdivided the same way so there
     // share the same topology and uvs
-    for (uint16_t j = 0, k = 0; j < divs; ++j) {
-        for (uint16_t i = 0; i < divs; ++i, ++k) {
-            nvertices[k] = 4;
-            vertices[k * 4    ] = (divs + 1) * j + i;
-            vertices[k * 4 + 1] = (divs + 1) * j + i + 1;
-            vertices[k * 4 + 2] = (divs + 1) * (j + 1) + i + 1;
-            vertices[k * 4 + 3] = (divs + 1) * (j + 1) + i;
+    for (unsigned j = 0, k = 0; j < divs; ++j) {
+        for (unsigned i = 0; i < divs; ++i, ++k) {
+            faceIndices->at(k) = 4;
+            vertIndices->at(k * 4) = (divs + 1) * j + i;
+            vertIndices->at(k * 4 + 1)  = (divs + 1) * j + i + 1;
+            vertIndices->at(k * 4 + 2)  = (divs + 1) * (j + 1) + i + 1;
+            vertIndices->at(k * 4 + 3)  = (divs + 1) * (j + 1) + i;
         }
     }
 
-    glm::vec3 controlPoints[16];
-    for (int np = 0; np < kTeapotNumPatches; ++np) { // kTeapotNumPatches
+    glm::vec3  controlPoints[16];
+    for (auto & teapotPatch : teapotPatches) {  //kTeapotNumPatches
         // set the control points for the current patch
-        for (uint32_t i = 0; i < 16; ++i)
-            controlPoints[i][0] = teapotVertices[teapotPatches[np][i] - 1][0],
-            controlPoints[i][1] = teapotVertices[teapotPatches[np][i] - 1][1],
-            controlPoints[i][2] = teapotVertices[teapotPatches[np][i] - 1][2];
-
+        for (unsigned i = 0; i < 16; ++i) {
+            controlPoints[i][0] = teapotVertices[teapotPatch[i] - 1][0];
+            controlPoints[i][1] = teapotVertices[teapotPatch[i] - 1][1];
+            controlPoints[i][2] = teapotVertices[teapotPatch[i] - 1][2];
+        }
         // generate grid
-        for (uint16_t j = 0, k = 0; j <= divs; ++j) {
+        for (unsigned j = 0, k = 0; j <= divs; ++j) {
             float v = j / (float)divs;
-            for (uint16_t i = 0; i <= divs; ++i, ++k) {
+            for (unsigned i = 0; i <= divs; ++i, ++k) {
                 float u = i / (float)divs;
-                P[k] = evalBezierPatch(controlPoints, u, v);
-                glm::vec3 dU = dUBezier(controlPoints, u, v);
-                glm::vec3 dV = dVBezier(controlPoints, u, v);
-                N[k] = glm::normalize(glm::cross(dU,dV));
-                st[k].x = u;
-                st[k].y = v;
+                verts->at(k) = evalBezierPatch(controlPoints, u, v);
+                glm::vec3  dU = dUBezier(controlPoints, u, v);
+                glm::vec3  dV = dVBezier(controlPoints, u, v);
+                normals->at(k) = glm::normalize(glm::cross(dU, dV));
+                st->at(k).x = u;
+                st->at(k).y = v;
             }
         }
 
-        objects.push_back(std::unique_ptr<PatchMesh>(new PatchMesh(o2w, divs * divs, nvertices, vertices, P, N, st)));
+//        objects.push_back(std::unique_ptr<PatchMesh>(
+//                new PatchMesh(
+//                        o2w,
+//                        divs * divs,
+//                        faceIndices,
+//                        vertIndices,
+//                        verts,
+//                        normals,
+//                        st)));
+
+        std::unique_ptr<MeshTriangle> meshTriangle =
+                std::make_unique<MeshTriangle>(
+                        verts,
+                        vertIndices,
+                        st,
+                        faceIndices,
+                        normals,
+                        o2w,
+                        divs * divs);
+
+
+        objects.push_back(std::move(meshTriangle));
     }
 }
+
 
 int main(int argc, char **argv)
 {
@@ -493,6 +536,11 @@ int main(int argc, char **argv)
     YAML::Node input = YAML::LoadFile(fileName + ".yaml");
 
     objects = loadSceneFromFile(fileName);
+
+    unsigned numOfObjects = objects.size();
+
+    std::cout << "Loaded " << numOfObjects << " objects" << std::endl;
+
 
 
     //o2w is the object to world transformation
@@ -509,7 +557,9 @@ int main(int argc, char **argv)
 
     createPolyTeapot(o2w, objects);
 
-    std::cout << "Created poly teapot" << std::endl;
+
+
+    std::cout << "Created poly teapot,which has " << objects.size() - numOfObjects << " objects" << std::endl;
 
 
     lights.push_back(std::unique_ptr<Light>(new Light(glm::vec3(0,4,-11), glm::vec3(1,1,1))));
@@ -517,8 +567,8 @@ int main(int argc, char **argv)
 
     // setting up options
     Options options;
-    options.width = 80;
-    options.height = 80;
+    options.width = 100;
+    options.height = 100;
     options.fov = 80;
     options.backgroundColor = glm::vec3(0.235294, 0.67451, 0.843137);
     options.maxDepth = 4;
