@@ -34,6 +34,8 @@
 #include "MeshTriangle.h"
 #include "Light.h"
 #include "teapotdata.h"
+#include <boost/range/combine.hpp>
+#include <memory>
 
 #include "yaml-cpp/yaml.h"
 //#include "PatchMesh.h"
@@ -71,27 +73,27 @@ HittableList loadSceneFromFile(const std::string& filename) {
             auto up_right_v = object["up_right"].as<std::vector<float>>();
             auto down_left_v = object["down_left"].as<std::vector<float>>();
             auto down_right_v = object["down_right"].as<std::vector<float>>();
-            auto material_name = object["material"].as<std::string>();
-            auto material = materials[material_name];
+//            material_name = object["material"].as<std::string>();
+            //auto material = materials[material_name];
 
             std::vector<glm::vec3> vertices;
-            vertices.push_back(glm::vec3(up_left_v[0], up_left_v[1], up_left_v[2]));
-            vertices.push_back(glm::vec3(up_right_v[0], up_right_v[1], up_right_v[2]));
-            vertices.push_back(glm::vec3(down_right_v[0], down_right_v[1], down_right_v[2]));
-            vertices.push_back(glm::vec3(down_left_v[0], down_left_v[1], down_left_v[2]));
+            vertices.emplace_back(up_left_v[0], up_left_v[1], up_left_v[2]);
+            vertices.emplace_back(up_right_v[0], up_right_v[1], up_right_v[2]);
+            vertices.emplace_back(glm::vec3(down_right_v[0], down_right_v[1], down_right_v[2]));
+            vertices.emplace_back(glm::vec3(down_left_v[0], down_left_v[1], down_left_v[2]));
 
             std::vector<glm::uvec3> vertIndices;
-            vertIndices.push_back(glm::uvec3(0, 1, 3));
-            vertIndices.push_back(glm::uvec3(1, 2, 3));
+            vertIndices.emplace_back(glm::uvec3(0, 1, 3));
+            vertIndices.emplace_back(glm::uvec3(1, 2, 3));
 
             std::vector<glm::uvec2> uvIndices;
-            uvIndices.push_back(glm::uvec2(0, 0));
-            uvIndices.push_back(glm::uvec2(1, 0));
-            uvIndices.push_back(glm::uvec2(1, 1));
-            uvIndices.push_back(glm::uvec2(0, 1));
+            uvIndices.emplace_back(glm::uvec2(0, 0));
+            uvIndices.emplace_back(glm::uvec2(1, 0));
+            uvIndices.emplace_back(glm::uvec2(1, 1));
+            uvIndices.emplace_back(glm::uvec2(0, 1));
 
     
-            objects.push_back(std::make_unique<MeshTriangle>(
+            objects.emplace_back(std::make_unique<MeshTriangle>(
                     vertices, vertIndices, uvIndices));
 
 
@@ -106,12 +108,12 @@ HittableList loadSceneFromFile(const std::string& filename) {
 
 
 
-// Returns true if the ray intersects an Hittable, false otherwise.
+// Returns true if the ray intersects a Hittable, false otherwise.
 // \param orig is the ray origin
 // \param dir is the ray direction
 // \param objects is the list of objects the scene contains
-// \param[out] tNear contains the distance to the cloesest intersected Hittable.
-// \param[out] index stores the index of the intersect triangle if the interesected Hittable is a mesh.
+// \param[out] tNear contains the distance to the closest intersected Hittable.
+// \param[out] index stores the index of the intersect triangle if the interested Hittable is a mesh.
 // \param[out] uv stores the u and v barycentric coordinates of the intersected point
 // \param[out] *hitObject stores the pointer to the intersected Hittable (used to retrieve material information, etc.)
 // \param isShadowRay is it a shadow ray. We can return from the function sooner as soon as we have found a hit.
@@ -137,7 +139,6 @@ bool trace(
             rec.p = orig + dir * rec.t;
             rec.t = tNearK;
             rec.uv = uvK;
-            rec.triIndex = indexK;
             rec.object = object.get();
         }
     }
@@ -158,23 +159,9 @@ glm::vec3 getReflectionColor (
     hit_record& rec, 
     const glm::vec3& dir, 
     const  Options& options,
-    int depth,
+    unsigned depth,
     const std::vector<std::unique_ptr<Hittable>>& objects,
-    const std::vector<std::unique_ptr<Light>>& lights)
-{
-    glm::vec3 reflectionDirection = normalize(reflect(dir, rec.normal));
-    glm::vec3 reflectionRayOrig = (glm::dot(reflectionDirection, rec.normal) < 0) ?
-                    rec.p - rec.normal * options.bias :
-                    rec.p + rec.normal * options.bias;
-
-    return castRay(
-        reflectionRayOrig, 
-        reflectionDirection, 
-        objects, 
-        lights, 
-        options, 
-        depth + 1);
-}
+    const std::vector<std::unique_ptr<Light>>& lights);
 
 glm::vec3 randomInUnitSphere()
 {
@@ -189,7 +176,7 @@ glm::vec3 getRefractionColor (
     hit_record& rec, 
     const glm::vec3& dir, 
     const Options& options,
-    int depth,
+    unsigned depth,
     const std::vector<std::unique_ptr<Hittable>>& objects,
     const std::vector<std::unique_ptr<Light>>& lights)
 {
@@ -209,26 +196,26 @@ glm::vec3 getRefractionColor (
     
 }
 
-// Implementation of the Whitted-syle light transport algorithm (E [S*] (D|G) L)
+// Implementation of the Whitted-style light transport algorithm (E [S*] (D|G) L)
 //
 // This function is the function that compute the color at the intersection point
 // of a ray defined by a position and a direction. Note that thus function is recursive (it calls itself).
 //
 // If the material of the intersected Hittable is either reflective or reflective and refractive,
-// then we compute the reflection/refracton direction and cast two new rays into the scene
+// then we compute the reflection/refraction direction and cast two new rays into the scene
 // by calling the castRay() function recursively. When the surface is transparent, we mix
 // the reflection and refraction color using the result of the fresnel equations (it computes
-// the amount of reflection and refractin depending on the surface normal, incident view direction
+// the amount of reflection and refraction depending on the surface normal, incident view direction
 // and surface refractive index).
 //
-// If the surface is duffuse/glossy we use the Phong illumation model to compute the color
+// If the surface is diffuse/glossy we use the Phong illumination model to compute the color
 // at the intersection point.
 glm::vec3 castRay(
     const glm::vec3 &orig, const glm::vec3 &dir,
     const std::vector<std::unique_ptr<Hittable>> &objects,
     const std::vector<std::unique_ptr<Light>> &lights,
     const Options &options,
-    uint32_t depth)
+    unsigned depth)
 {
     if (depth > options.maxDepth) {
         return options.backgroundColor;
@@ -290,7 +277,7 @@ glm::vec3 castRay(
             default:
             {
 
-                // We use the Phong illumation model int the default case. The phong model
+                // We use the Phong illumination model int the default case. The phong model
                 // is composed of a diffuse and a specular reflection component.
 
                 glm::vec3 lightAmt = glm::vec3(0,0,0), specularColor =  glm::vec3(0,0,0);
@@ -303,7 +290,13 @@ glm::vec3 castRay(
                 for (const auto &light : lights) {
                     glm::vec3 lightDir = light->position - hitPoint;
                     lightDir = normalize(lightDir);
-                    float LdotN = std::max(0.f, glm::dot(lightDir, N));
+                    float cosine = std::max(0.f, glm::dot(lightDir, N));
+                    // cosine is the cosine of the angle between the light direction and the normal
+                    // at the intersection point. If cosine is 0, then the light is perpendicular to the
+                    // surface and thus does not contribute to the illumination of the surface.
+                    // If cosine is 1, then the light is parallel to the surface and thus contributes
+                    // the maximum amount of illumination to the surface.
+                    
                     //Hittable *shadowHitObject = nullptr;
                     hit_record shadowRec;
                     // is the point in shadow, and is the nearest occluding Hittable closer to the Hittable than the light itself?
@@ -311,7 +304,7 @@ glm::vec3 castRay(
                         shadowRec.t * shadowRec.t < glm::dot(lightDir, lightDir);
 
                     if(!inShadow) {
-                       lightAmt += light->intensity * LdotN;
+                       lightAmt += light->intensity * cosine;
                     }
 
                     glm::vec3 reflectionDirection = reflect(-lightDir, N);
@@ -326,6 +319,23 @@ glm::vec3 castRay(
     return hitColor;
 }
 
+glm::vec3 getReflectionColor(hit_record &rec, const glm::vec3 &dir, const Options &options, unsigned int depth,
+                             const std::vector<std::unique_ptr<Hittable>> &objects,
+                             const std::vector<std::unique_ptr<Light>> &lights) {
+    glm::vec3 reflectionDirection = normalize(reflect(dir, rec.normal));
+    glm::vec3 reflectionRayOrig = (glm::dot(reflectionDirection, rec.normal) < 0) ?
+                                  rec.p - rec.normal * options.bias :
+                                  rec.p + rec.normal * options.bias;
+
+    return castRay(
+            reflectionRayOrig,
+            reflectionDirection,
+            objects,
+            lights,
+            options,
+            depth + 1);
+}
+
 // [comment]
 // The main render function. This where we iterate over all pixels in the image, generate
 // primary rays and cast these rays into the scene. The content of the framebuffer is
@@ -338,23 +348,24 @@ void render(
 {
     glm::vec3 orig(0);
     multVecMatrix(glm::vec3(0), orig,options.cameraToWorld);
-    glm::vec3 *framebuffer = new glm::vec3[options.width * options.height];
-    glm::vec3 *pix = framebuffer;
-    float scale = tan(glm::radians(options.fov * 0.5));
-    float imageAspectRatio = options.width / (float)options.height;
+    auto framebuffer = std::vector<glm::vec3>(options.width * options.height);
+    auto scale = (float)tan(glm::radians(options.fov * 0.5));
+    float imageAspectRatio = (float)options.width / (float)options.height;
+    int index = 0;
 
-    for (uint32_t j = 0; j < options.height; ++j) {
-        for (uint32_t i = 0; i < options.width; ++i) {
+
+    for (unsigned j = 0; j < options.height; ++j) {
+        for (unsigned i = 0; i < options.width; ++i) {
             // generate primary ray direction
-            float x = (2 * (i + 0.5) / (float)options.width - 1) * imageAspectRatio * scale;
-            float y = (1 - 2 * (j + 0.5) / (float)options.height) * scale;
+            float x = (2.0f * ((float)i + 0.5f) / (float)options.width - 1.0f) * imageAspectRatio * scale;
+            float y = (1.0f - 2.0f * ((float)j + 0.5f) / (float)options.height) * scale;
 //            glm::vec3 dir = normalize(glm::vec3(x, y, -1));
             glm::vec3 dir;
             multDirMatrix(glm::vec3(x, y, -1), dir,options.cameraToWorld);
             dir = glm::normalize(dir);
-            *(pix++) = castRay(orig, dir, objects, lights, options, 0);
+            framebuffer[index++] = castRay(orig, dir, objects, lights, options, 0);
         }
-        std::cout << "\rRendering (" << 1 << " spp) " << 100.f * j / (options.height - 1) << "%" << std::flush;
+        std::cout << "\rRendering (" << 1 << " spp) " << 100.f * (float)j / (float)(options.height - 1) << "%" << std::flush;
     }
 
     // save framebuffer to file
@@ -369,66 +380,126 @@ void render(
     }
 
     ofs.close();
-
-    delete [] framebuffer;
 }
 
 // In the main function of the program, we create the scene (create objects and lights)
-// as well as set the options for the render (image widht and height, maximum recursion
+// as well as set the options for the render (image width and height, maximum recursion
 // depth, field-of-view, etc.). We then call the render function().
 
-glm::vec3 evalBezierCurve(const std::vector<glm::vec3> & P, const float &t) 
-{ 
-    float b0 = (1 - t) * (1 - t) * (1 - t); 
-    float b1 = 3 * t * (1 - t) * (1 - t); 
-    float b2 = 3 * t * t * (1 - t); 
-    float b3 = t * t * t; 
- 
-    return P[0] * b0 + P[1] * b1 + P[2] * b2 + P[3] * b3; 
-} 
- 
-glm::vec3 evalBezierPatch(const std::vector<glm::vec3> controlPoints, const float &u, const float &v) 
-{ 
-    std::vector<glm::vec3> uCurve; 
-    for (int i = 0; i < 4; ++i){
-        uCurve[i] = evalBezierCurve({controlPoints[i * 4 + 0], controlPoints[i * 4 + 1], controlPoints[i * 4 + 2], controlPoints[i * 4 + 3]}, u);
-    }
-        
-    return evalBezierCurve(uCurve, v); 
-} 
- 
-glm::vec3 derivBezier(const std::vector<glm::vec3>& P, const float &t) 
-{ 
-    return -3 * (1 - t) * (1 - t) * P[0] + 
-        (3 * (1 - t) * (1 - t) - 6 * t * (1 - t)) * P[1] + 
-        (6 * t * (1 - t) - 3 * t * t) * P[2] + 
-        3 * t * t * P[3]; 
-} 
 
-glm::vec3 dUBezier(const std::vector<glm::vec3>& controlPoints, const float &u, const float &v) 
-{ 
-    std::vector<glm::vec3> P; 
-    std::vector<glm::vec3> vCurve; 
-    for (int i = 0; i < 4; ++i) { 
-        P[0] = controlPoints[i]; 
-        P[1] = controlPoints[4 + i]; 
-        P[2] = controlPoints[8 + i]; 
-        P[3] = controlPoints[12 + i]; 
-        vCurve[i] = evalBezierCurve(P, v); 
-    } 
- 
-    return derivBezier(vCurve, u); 
-} 
+//void createCurveGeometry(std::vector<std::unique_ptr<Hittable>> &objects)
+//{
+//    unsigned ndivs = 16;
+//    unsigned ncurves = 1 + (curveNumPts - 4) / 3;
+//    std::vector<glm::vec3> pts(4);
+//
+//    auto P = std::make_unique<std::vector<glm::vec3>>((ndivs + 1) * ndivs * ncurves + 1);
+//    auto N = std::make_unique<std::vector<glm::vec3>>((ndivs + 1) * ndivs * ncurves + 1);
+//    auto st = std::make_unique<std::vector<glm::uvec2>>((ndivs + 1) * ndivs * ncurves + 1);
+//
+//
+//
+//    for (uint32_t i = 0; i < ncurves; ++i) {
+//        for (uint32_t j = 0; j < ndivs; ++j) {
+//            pts[0] = curveData[i * 3];
+//            pts[1] = curveData[i * 3 + 1];
+//            pts[2] = curveData[i * 3 + 2];
+//            pts[3] = curveData[i * 3 + 3];
+//            float s = j / (float)ndivs;
+//            glm::vec3 pt = evalBezierCurve(pts, s);
+//            glm::vec3 tangent = glm::normalize(derivBezier(pts, s));
+//            bool swap = false;
+//
+//            uint8_t maxAxis;
+//            if (std::abs(tangent.x) > std::abs(tangent.y))
+//                if (std::abs(tangent.x) > std::abs(tangent.z))
+//                    maxAxis = 0;
+//                else
+//                    maxAxis = 2;
+//            else if (std::abs(tangent.y) > std::abs(tangent.z))
+//                maxAxis = 1;
+//            else
+//                maxAxis = 2;
+//
+//            glm::vec3 up, forward, right;
+//
+//            switch (maxAxis) {
+//                case 0:
+//                case 1:
+//                    up = tangent;
+//                    forward = glm::vec3(0, 0, 1);
+//                    right = glm::cross(up,forward);
+//                    forward = glm::cross(right,up);
+//                    break;
+//                case 2:
+//                    up = tangent;
+//                    right = glm::vec3(0, 0, 1);
+//                    forward = glm::cross(right,up);
+//                    right = glm::cross(up,forward);
+//                    break;
+//                default:
+//                    break;
+//            };
+//
+//            float sNormalized = (i * ndivs + j) / float(ndivs * ncurves);
+//            float rad = 0.1 * (1 - sNormalized);
+//            for (uint32_t k = 0; k <= ndivs; ++k) {
+//                float t = k / (float)ndivs;
+//                float theta = t * 2 * M_PI;
+//                glm::vec3 pc(cos(theta) * rad, 0, sin(theta) * rad);
+//                float x = pc.x * right.x + pc.y * up.x + pc.z * forward.x;
+//                float y = pc.x * right.y + pc.y * up.y + pc.z * forward.y;
+//                float z = pc.x * right.z + pc.y * up.z + pc.z * forward.z;
+//                P[i * (ndivs + 1) * ndivs + j * (ndivs + 1) + k] = glm::vec3(pt.x + x, pt.y + y, pt.z + z);
+//                N[i * (ndivs + 1) * ndivs + j * (ndivs + 1) + k] = glm::normalize(glm::vec3(x, y, z));
+//                st[i * (ndivs + 1) * ndivs + j * (ndivs + 1) + k] = glm::vec2(sNormalized, t);
+//            }
+//        }
+//    }
+//    P[(ndivs + 1) * ndivs * ncurves] = curveData[curveNumPts - 1];
+//    N[(ndivs + 1) * ndivs * ncurves] = (curveData[curveNumPts - 2] - glm::normalize(curveData[curveNumPts - 1]));
+//    st[(ndivs + 1) * ndivs * ncurves] = glm::vec2(1, 0.5);
+//    uint32_t numFaces = ndivs * ndivs * ncurves;
+//    std::unique_ptr<uint32_t []> verts(new uint32_t[numFaces]);
+//    for (uint32_t i = 0; i < numFaces; ++i)
+//        verts[i] = (i < (numFaces - ndivs)) ? 4 : 3;
+//    std::unique_ptr<uint32_t []> vertIndices(new uint32_t[ndivs * ndivs * ncurves * 4 + ndivs * 3]);
+//    uint32_t nf = 0, ix = 0;
+//    for (uint32_t k = 0; k < ncurves; ++k) {
+//        for (uint32_t j = 0; j < ndivs; ++j) {
+//            if (k == (ncurves - 1) && j == (ndivs - 1)) { break; }
+//            for (uint32_t i = 0; i < ndivs; ++i) {
+//                vertIndices[ix] = nf;
+//                vertIndices[ix + 1] = nf + (ndivs + 1);
+//                vertIndices[ix + 2] = nf + (ndivs + 1) + 1;
+//                vertIndices[ix + 3] = nf + 1;
+//                ix += 4;
+//                ++nf;
+//            }
+//            nf++;
+//        }
+//    }
+//
+//    for (uint32_t i = 0; i < ndivs; ++i) {
+//        vertIndices[ix] = nf;
+//        vertIndices[ix + 1] = (ndivs + 1) * ndivs * ncurves;
+//        vertIndices[ix + 2] = nf + 1;
+//        ix += 3;
+//        nf++;
+//    }
+//
+//    objects.push_back(std::unique_ptr<MeshTriangle>(new MeshTriangle(
+//            st,
+//            verts,
+//            N,
+//            vertIndices,
+//            P,
+//            glm::mat4(1.0f),
+//            )));
+//}
+//
 
-glm::vec3 dVBezier(const  std::vector<glm::vec3>& controlPoints, const float &u, const float &v) 
-{ 
-    std::vector<glm::vec3> uCurve; 
-    for (int i = 0; i < 4; ++i) { 
-        uCurve[i] = evalBezierCurve({controlPoints[i * 4 + 0], controlPoints[i * 4 + 1], controlPoints[i * 4 + 2], controlPoints[i * 4 + 3]}, u);
-    } 
- 
-    return derivBezier(uCurve, v); 
-}
+
 
 void createPolyTeapot(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable>> &objects)
 {
@@ -475,37 +546,31 @@ void createPolyTeapot(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable
         }
     }
 
-    glm::vec3  controlPoints[16];
+    std::vector<glm::vec3> controlPoints(16);
     for (auto & teapotPatch : teapotPatches) {  //kTeapotNumPatches
         // set the control points for the current patch
-        for (unsigned i = 0; i < 16; ++i) {
-            controlPoints[i][0] = teapotVertices[teapotPatch[i] - 1][0];
-            controlPoints[i][1] = teapotVertices[teapotPatch[i] - 1][1];
-            controlPoints[i][2] = teapotVertices[teapotPatch[i] - 1][2];
+        for (auto tup : boost::combine(controlPoints, teapotPatch)) {
+            //boost:combine is a zip function, it combines two vectors into a tuple, which is then unpacked
+            glm::vec3 &cp = tup.get<0>();
+            unsigned &idx = tup.get<1>();
+            cp = teapotVertices[idx - 1];
         }
+
+
         // generate grid
         for (unsigned j = 0, k = 0; j <= divs; ++j) {
-            float v = j / (float)divs;
+            float v = (float)j / (float)divs;
             for (unsigned i = 0; i <= divs; ++i, ++k) {
-                float u = i / (float)divs;
+                float u = (float)i / (float)divs;
                 verts->at(k) = evalBezierPatch(controlPoints, u, v);
                 glm::vec3  dU = dUBezier(controlPoints, u, v);
                 glm::vec3  dV = dVBezier(controlPoints, u, v);
                 normals->at(k) = glm::normalize(glm::cross(dU, dV));
-                st->at(k).x = u;
-                st->at(k).y = v;
+                st->at(k).x = (int)u;
+                st->at(k).y = (int)v;
             }
         }
 
-//        objects.push_back(std::unique_ptr<PatchMesh>(
-//                new PatchMesh(
-//                        o2w,
-//                        divs * divs,
-//                        faceIndices,
-//                        vertIndices,
-//                        verts,
-//                        normals,
-//                        st)));
 
         std::unique_ptr<MeshTriangle> meshTriangle =
                 std::make_unique<MeshTriangle>(
@@ -517,13 +582,15 @@ void createPolyTeapot(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable
                         o2w,
                         divs * divs);
 
+        meshTriangle->materialType = MaterialType::DIFFUSE_AND_GLOSSY;
+
 
         objects.push_back(std::move(meshTriangle));
     }
 }
 
 
-int main(int argc, char **argv)
+int main()
 {
     YAML::Node config = YAML::LoadFile("config.yaml");
     
@@ -549,33 +616,33 @@ int main(int argc, char **argv)
     //the teapot is centered at the origin, so we need to translate it to the position we want
     //to translate it to the position (0, 0, 0), we need to translate it by (-0.5, -0.5, -0.5)
     glm::mat4 o2w = glm::translate(glm::mat4(1.0f), glm::vec3(-1 ,-3, -5));
-    //to rotate it, we need to rotate it by 90 degrees around the x axis
+    //to rotate it, we need to rotate it by 90 degrees around the x-axis
     o2w = glm::rotate(o2w, glm::radians(-90.0f), glm::vec3(1, 0, 0));
     //to scale it, we need to scale it by 0.5
     o2w = glm::scale(o2w, glm::vec3(0.7, 0.7, 0.7));
 
 
     createPolyTeapot(o2w, objects);
-
+//    createCurveGeometry(objects);
 
 
     std::cout << "Created poly teapot,which has " << objects.size() - numOfObjects << " objects" << std::endl;
 
 
-    lights.push_back(std::unique_ptr<Light>(new Light(glm::vec3(0,4,-11), glm::vec3(1,1,1))));
-    lights.push_back(std::unique_ptr<Light>(new Light(glm::vec3(0,0,5), glm::vec3(1,1,1))));
+    lights.push_back(std::make_unique<Light>(glm::vec3(0,4,-11), glm::vec3(1,1,1)));
+    lights.push_back(std::make_unique<Light>(glm::vec3(0,0,5), glm::vec3(1,1,1)));
 
     // setting up options
-    Options options;
-    options.width = 100;
-    options.height = 100;
+    Options options{};
+    options.width = 200;
+    options.height = 200;
     options.fov = 80;
     options.backgroundColor = glm::vec3(0.235294, 0.67451, 0.843137);
     options.maxDepth = 4;
     options.bias = 0.00001;
     //cameraToWorld is the inverse of the camera matrix
     //it is the matrix that transforms from world space to camera space
-    //we create it by rotating around the y axis by 180 degrees and then translating by (0,0,5)
+    //we create it by rotating around the y-axis by 180 degrees and then translating by (0,0,5)
     options.cameraToWorld = glm::mat4(1.0f);
     //options.cameraToWorld = glm::translate(options.cameraToWorld, glm::vec3(0,1,5));
     //options.cameraToWorld = glm::rotate(options.cameraToWorld, glm::radians(50.0f), glm::vec3(0,1,0));

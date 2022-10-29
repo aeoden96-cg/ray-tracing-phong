@@ -14,7 +14,7 @@ struct hit_record {
     Hittable *object = nullptr;
     glm::vec2 st;
     glm::vec2 uv;
-    int triIndex;
+    unsigned triIndex;
 };
 
 class Hittable
@@ -23,12 +23,12 @@ class Hittable
     Hittable() :
         materialType(DIFFUSE_AND_GLOSSY),
         ior(1.3), Kd(0.8), Ks(0.2), diffuseColor(0.2), specularExponent(25) {}
-    virtual ~Hittable() {}
+    virtual ~Hittable() = default;
     virtual bool intersect(
             const glm::vec3 &orig,
             const glm::vec3 &dir,
             float &tNearK,
-            uint32_t &indexK,
+            unsigned &indexK,
             glm::vec2 &uvK,
             hit_record& rec) const = 0;
 
@@ -43,7 +43,7 @@ class Hittable
     float Kd, Ks;
     glm::vec3 diffuseColor;
     float specularExponent;
-    glm::mat4 objectToWorld, worldToObject;
+    glm::mat4 objectToWorld{}, worldToObject{};
     std::vector<glm::vec3> BBox = {{kInfinity, kInfinity, kInfinity}, {-kInfinity, -kInfinity, -kInfinity}};
 
     Hittable(const glm::mat4 o2w): objectToWorld(o2w), worldToObject(glm::inverse(o2w)){} 

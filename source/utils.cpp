@@ -105,27 +105,30 @@ float fresnel(const glm::vec3 &I, const glm::vec3 &N, const float &ior)
 
 
 
-glm::vec3 evalBezierCurve(const glm::vec3 *P, const float &t)
+glm::vec3 evalBezierCurve(const std::vector<glm::vec3> &P, const float &t, int offset)
 {
     float b0 = (1 - t) * (1 - t) * (1 - t);
     float b1 = 3 * t * (1 - t) * (1 - t);
     float b2 = 3 * t * t * (1 - t);
     float b3 = t * t * t;
 
-    return P[0] * b0 + P[1] * b1 + P[2] * b2 + P[3] * b3;
+    return  P[offset] * b0 +
+            P[offset + 1] * b1 +
+            P[offset + 2] * b2 +
+            P[offset + 3] * b3;
 }
 
-glm::vec3 dVBezier(const glm::vec3 *controlPoints, const float &u, const float &v)
+glm::vec3 dVBezier(const std::vector<glm::vec3> &controlPoints, const float &u, const float &v)
 {
-    glm::vec3 uCurve[4];
+    std::vector<glm::vec3> uCurve(4);
     for (int i = 0; i < 4; ++i) {
-        uCurve[i] = evalBezierCurve(controlPoints + 4 * i, u);
+        uCurve[i] = evalBezierCurve(controlPoints, u, i * 4);
     }
 
     return derivBezier(uCurve, v);
 }
 
-glm::vec3 derivBezier(const glm::vec3 *P, const float &t)
+glm::vec3 derivBezier(const std::vector<glm::vec3>& P, const float &t)
 {
     return -3 * (1 - t) * (1 - t) * P[0] +
            (3 * (1 - t) * (1 - t) - 6 * t * (1 - t)) * P[1] +
@@ -162,26 +165,26 @@ void multVecMatrix(const glm::vec3 &src, glm::vec3 &dst,glm::mat4& x)
 
 
 
-glm::vec3 evalBezierPatch(const glm::vec3 *controlPoints, const float &u, const float &v)
+glm::vec3 evalBezierPatch(const std::vector<glm::vec3>& controlPoints, const float &u, const float &v)
 {
-    glm::vec3 uCurve[4];
+    std::vector<glm::vec3> uCurve(4);
     for (int i = 0; i < 4; ++i)
-        uCurve[i] = evalBezierCurve(controlPoints + 4 * i, u);
+        uCurve[i] = evalBezierCurve(controlPoints, u, i * 4);
 
-    return evalBezierCurve(uCurve, v);
+    return evalBezierCurve(uCurve, v, 0);
 }
 
 
-glm::vec3 dUBezier(const glm::vec3 *controlPoints, const float &u, const float &v)
+glm::vec3 dUBezier(const std::vector<glm::vec3> &controlPoints, const float &u, const float &v)
 {
-    glm::vec3 P[4];
-    glm::vec3 vCurve[4];
+    std::vector<glm::vec3> P(4);
+    std::vector<glm::vec3> vCurve(4);
     for (int i = 0; i < 4; ++i) {
         P[0] = controlPoints[i];
         P[1] = controlPoints[4 + i];
         P[2] = controlPoints[8 + i];
         P[3] = controlPoints[12 + i];
-        vCurve[i] = evalBezierCurve(P, v);
+        vCurve[i] = evalBezierCurve(P, v, 0);
     }
 
     return derivBezier(vCurve, u);

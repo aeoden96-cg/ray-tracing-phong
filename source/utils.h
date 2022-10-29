@@ -86,17 +86,17 @@ void multVecMatrix(const glm::vec3 &src, glm::vec3 &dst,glm::mat4& x);
 
 void multDirMatrix(const glm::vec3 &src, glm::vec3 &dst,glm::mat4& x);
 
-// Compute the position of a point along a Bezier curve at t [0:1]
-glm::vec3 evalBezierCurve(const glm::vec3 *P, const float &t);
+// Compute the position of a point along a Bézier curve at t [0:1]
+glm::vec3 evalBezierCurve(const std::vector<glm::vec3> &P, const float &t, int offset);
 
-glm::vec3 evalBezierPatch(const glm::vec3 *controlPoints, const float &u, const float &v);
-glm::vec3 derivBezier(const glm::vec3 *P, const float &t);
+glm::vec3 evalBezierPatch(const std::vector<glm::vec3> &controlPoints, const float &u, const float &v);
+glm::vec3 derivBezier(const std::vector<glm::vec3>&P, const float &t);
 
 // Compute the derivative of a point on Bezier patch along the u parametric direction
-glm::vec3 dUBezier(const glm::vec3 *controlPoints, const float &u, const float &v);
+glm::vec3 dUBezier(const std::vector<glm::vec3>& controlPoints, const float &u, const float &v);
 
 // Compute the derivative of a point on Bezier patch along the v parametric direction
-glm::vec3 dVBezier(const glm::vec3 *controlPoints, const float &u, const float &v);
+glm::vec3 dVBezier(const std::vector<glm::vec3>& controlPoints, const float &u, const float &v);
 
 
 

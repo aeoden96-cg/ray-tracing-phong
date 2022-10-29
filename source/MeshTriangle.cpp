@@ -70,7 +70,7 @@ MeshTriangle::MeshTriangle(
 
 
 
-        for (uint32_t i = 0, k = 0, l = 0; i < nfaces; ++i) { // for each  face
+        for (unsigned i = 0, k = 0, l = 0; i < nfaces; ++i) { // for each  face
             for (uint32_t j = 0; j < faceIndices_in->at(i) - 2; ++j) {
                 multDirMatrix(normals_in->at(k), N->at(l), transformNormals);
                 multDirMatrix(normals_in->at(k + j + 1), N->at(l+1), transformNormals);
@@ -142,6 +142,8 @@ void MeshTriangle::getSurfaceProperties(
     //vai is vertex attribute index, which is the index of the vertex in the vertices array
     //triIndex is the index of the triangle in the vertIndices array
 
+    //isSingleVertAttr is a boolean that tells us if we have 1 vertex attribute per vertex per face
+    //or 1 vertex attribute per vertex
 
     if (isSingleVertAttr) {
         triangle = vertIndices->at(rec.triIndex);

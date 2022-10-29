@@ -10,14 +10,14 @@ class MeshTriangle : public Hittable
 {
 public:
     MeshTriangle(
-        std::vector<glm::vec3>& vertices,
-        std::vector<glm::uvec3>&  vertIndices,
-        std::vector<glm::uvec2>& st):
+        std::vector<glm::vec3>& vertices_in,
+        std::vector<glm::uvec3>&  vertIndices_in,
+        std::vector<glm::uvec2>& st_in):
         smoothShading(false){
 
-        this->vertices = std::make_unique<std::vector<glm::vec3>>(vertices);
-        this->vertIndices = std::make_unique<std::vector<glm::uvec3>>(vertIndices);
-        this->st = std::make_unique<std::vector<glm::uvec2>>(st);
+        this->vertices = std::make_unique<std::vector<glm::vec3>>(vertices_in);
+        this->vertIndices = std::make_unique<std::vector<glm::uvec3>>(vertIndices_in);
+        this->st = std::make_unique<std::vector<glm::uvec2>>(st_in);
     }
 
 
@@ -43,7 +43,7 @@ public:
         const glm::vec3 &I, 
         hit_record& rec) const override;
 
-    glm::vec3 evalDiffuseColor(const glm::vec2 &st) const;
+    glm::vec3 evalDiffuseColor(const glm::vec2 &st) const override;
 
     std::unique_ptr<std::vector<glm::vec3>> vertices;
     std::unique_ptr<std::vector<glm::uvec3>> vertIndices;
