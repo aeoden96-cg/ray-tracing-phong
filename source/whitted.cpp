@@ -82,15 +82,15 @@ HittableList loadSceneFromFile(const std::string& filename) {
             vertices.emplace_back(glm::vec3(down_right_v[0], down_right_v[1], down_right_v[2]));
             vertices.emplace_back(glm::vec3(down_left_v[0], down_left_v[1], down_left_v[2]));
 
-            std::vector<glm::uvec3> vertIndices;
-            vertIndices.emplace_back(glm::uvec3(0, 1, 3));
-            vertIndices.emplace_back(glm::uvec3(1, 2, 3));
+            std::vector<glm::vec3> vertIndices;
+            vertIndices.emplace_back(glm::vec3(0, 1, 3));
+            vertIndices.emplace_back(glm::vec3(1, 2, 3));
 
-            std::vector<glm::uvec2> uvIndices;
-            uvIndices.emplace_back(glm::uvec2(0, 0));
-            uvIndices.emplace_back(glm::uvec2(1, 0));
-            uvIndices.emplace_back(glm::uvec2(1, 1));
-            uvIndices.emplace_back(glm::uvec2(0, 1));
+            std::vector<glm::vec2> uvIndices;
+            uvIndices.emplace_back(glm::vec2(0, 0));
+            uvIndices.emplace_back(glm::vec2(1, 0));
+            uvIndices.emplace_back(glm::vec2(1, 1));
+            uvIndices.emplace_back(glm::vec2(0, 1));
 
     
             objects.emplace_back(std::make_unique<MeshTriangle>(
@@ -276,6 +276,8 @@ glm::vec3 castRay(
             }
             default:
             {
+//                hitColor = rec.object->evalDiffuseColor(st);
+//                break;
 
                 // We use the Phong illumination model int the default case. The phong model
                 // is composed of a diffuse and a specular reflection component.
@@ -351,15 +353,14 @@ void render(
     auto framebuffer = std::vector<glm::vec3>(options.width * options.height);
     auto scale = (float)tan(glm::radians(options.fov * 0.5));
     float imageAspectRatio = (float)options.width / (float)options.height;
+
     int index = 0;
-
-
     for (unsigned j = 0; j < options.height; ++j) {
         for (unsigned i = 0; i < options.width; ++i) {
             // generate primary ray direction
             float x = (2.0f * ((float)i + 0.5f) / (float)options.width - 1.0f) * imageAspectRatio * scale;
             float y = (1.0f - 2.0f * ((float)j + 0.5f) / (float)options.height) * scale;
-//            glm::vec3 dir = normalize(glm::vec3(x, y, -1));
+            // glm::vec3 dir = normalize(glm::vec3(x, y, -1));
             glm::vec3 dir;
             multDirMatrix(glm::vec3(x, y, -1), dir,options.cameraToWorld);
             dir = glm::normalize(dir);
@@ -505,34 +506,11 @@ void createPolyTeapot(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable
 {
     uint32_t divs = 8;
 
-    typedef std::vector<glm::vec3> PointList;
-//    typedef std::vector<PointList> PatchList;
-    typedef std::vector<unsigned > IndexList;
-    typedef std::vector<glm::uvec2> TexSTList;
-
-
-//    PointList verts((divs + 1) * (divs + 1));
-//    IndexList faceIndices(divs * divs);
-//    IndexList vertIndices(divs * divs * 4);
-//    PointList normals((divs + 1) * (divs + 1));
-//    TexSTList st((divs + 1) * (divs + 1));
-
     std::unique_ptr<PointList> verts = std::make_unique<PointList>((divs + 1) * (divs + 1));
     std::unique_ptr<IndexList> faceIndices = std::make_unique<IndexList>(divs * divs);
     std::unique_ptr<IndexList> vertIndices = std::make_unique<IndexList>(divs * divs * 4);
     std::unique_ptr<PointList> normals = std::make_unique<PointList>((divs + 1) * (divs + 1));
     std::unique_ptr<TexSTList> st = std::make_unique<TexSTList>((divs + 1) * (divs + 1));
-
-
-
-
-
-
-//    std::unique_ptr<glm::vec3 []> verts(new glm::vec3 [(divs + 1) * (divs + 1)]);
-//    std::unique_ptr<uint32_t []> faceIndices(new uint32_t[divs * divs]);
-//    std::unique_ptr<uint32_t []> vertIndices(new uint32_t[divs * divs * 4]);
-//    std::unique_ptr<glm::vec3  []> normals(new glm::vec3 [(divs + 1) * (divs + 1)]);
-//    std::unique_ptr<glm::vec2 []> st(new glm::vec2[(divs + 1) * (divs + 1)]);
 
     // face connectivity - all patches are subdivided the same way so there
     // share the same topology and uvs
@@ -566,8 +544,8 @@ void createPolyTeapot(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable
                 glm::vec3  dU = dUBezier(controlPoints, u, v);
                 glm::vec3  dV = dVBezier(controlPoints, u, v);
                 normals->at(k) = glm::normalize(glm::cross(dU, dV));
-                st->at(k).x = (int)u;
-                st->at(k).y = (int)v;
+                st->at(k).x = u;
+                st->at(k).y = v;
             }
         }
 
@@ -630,7 +608,7 @@ int main()
 
 
     lights.push_back(std::make_unique<Light>(glm::vec3(0,4,-11), glm::vec3(1,1,1)));
-    lights.push_back(std::make_unique<Light>(glm::vec3(0,0,5), glm::vec3(1,1,1)));
+//    lights.push_back(std::make_unique<Light>(glm::vec3(0,0,5), glm::vec3(1,1,1)));
 
     // setting up options
     Options options{};
@@ -638,7 +616,7 @@ int main()
     options.height = 200;
     options.fov = 80;
     options.backgroundColor = glm::vec3(0.235294, 0.67451, 0.843137);
-    options.maxDepth = 4;
+    options.maxDepth = 2;
     options.bias = 0.00001;
     //cameraToWorld is the inverse of the camera matrix
     //it is the matrix that transforms from world space to camera space

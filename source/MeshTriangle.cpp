@@ -6,7 +6,7 @@
 MeshTriangle::MeshTriangle(
     std::unique_ptr<std::vector<glm::vec3>>& vertices_in,
     std::unique_ptr<std::vector<unsigned int>>& vertIndices_in,
-    std::unique_ptr<std::vector<glm::uvec2>>& st_in,
+    std::unique_ptr<std::vector<glm::vec2>>& st_in,
     std::unique_ptr<std::vector<unsigned int>>& faceIndices_in,
     std::unique_ptr<std::vector<glm::vec3>>& normals_in,
     const glm::mat4 &o2w,
@@ -43,7 +43,7 @@ MeshTriangle::MeshTriangle(
     }
 
     // allocate memory to store triangle indices
-    this->vertIndices = std::make_unique<std::vector<glm::uvec3>>(numTris);
+    this->vertIndices = std::make_unique<std::vector<glm::vec3>>(numTris);
 
     glm::mat4 transformNormals = glm::transpose(worldToObject);
     // [comment]
@@ -57,7 +57,7 @@ MeshTriangle::MeshTriangle(
 
     if (isSingleVertAttr) {
         this->N = std::make_unique<std::vector<glm::vec3>>(maxVertIndex);
-        this->st = std::make_unique<std::vector<glm::uvec2>>(maxVertIndex);
+        this->st = std::make_unique<std::vector<glm::vec2>>(maxVertIndex);
 
         for (uint32_t i = 0; i < maxVertIndex; ++i) {
             this->st->at(i) = st_in->at(i);
@@ -66,7 +66,7 @@ MeshTriangle::MeshTriangle(
     }
     else {
         this->N = std::make_unique<std::vector<glm::vec3>>(numTris);
-        this->st = std::make_unique<std::vector<glm::uvec2>>(numTris);
+        this->st = std::make_unique<std::vector<glm::vec2>>(numTris);
 
 
 
@@ -89,7 +89,7 @@ MeshTriangle::MeshTriangle(
     // generate the triangle index array and set normals_in and st_in coordinates
     for (unsigned int i = 0, k = 0, l = 0; i < nfaces; ++i) { // for each  face
         for (unsigned int j = 0; j < faceIndices_in->at(i) - 2; ++j) { // for each triangle in the face
-            this->vertIndices->at(l) = glm::uvec3(
+            this->vertIndices->at(l) = glm::vec3(
                     vertIndices_in->at(k),
                     vertIndices_in->at(k + j + 1),
                     vertIndices_in->at(k + j + 2)
@@ -112,7 +112,7 @@ bool MeshTriangle::intersect(
     int k = 0;
     bool intersect = false;
 
-    for (const glm::uvec3& triangle : *this->vertIndices) {
+    for (const glm::vec3& triangle : *this->vertIndices) {
         const glm::vec3 & v0 = this->vertices->at(triangle.x);
         const glm::vec3 & v1 = this->vertices->at(triangle.y);
         const glm::vec3 & v2 = this->vertices->at(triangle.z);
@@ -130,13 +130,9 @@ bool MeshTriangle::intersect(
 }
 
 
-void MeshTriangle::getSurfaceProperties(
-        const glm::vec3 &I,
-        hit_record& rec) const
-{
+void MeshTriangle::calcNormal(hit_record& rec) const{
     //first we need to get the triangle from the index
     auto triangle = vertIndices->at(rec.triIndex);
-
 
     //--------------------normal--------------------
     //vai is vertex attribute index, which is the index of the vertex in the vertices array
@@ -176,6 +172,11 @@ void MeshTriangle::getSurfaceProperties(
     // doesn't need to be normalized as the N's are normalized but just for safety
     rec.normal = glm::normalize(rec.normal);
 
+}
+
+void MeshTriangle::calcST(hit_record& rec) const{
+    auto triangle = vertIndices->at(rec.triIndex);
+
     //now we need to get the st coordinates of the triangle
     //st coordinates are the texture coordinates
     //we need to interpolate the st coordinates of the triangle
@@ -199,6 +200,19 @@ void MeshTriangle::getSurfaceProperties(
 
 }
 
+
+
+void MeshTriangle::getSurfaceProperties(
+        const glm::vec3 &I,
+        hit_record& rec) const
+{
+
+    rec.material = MaterialType::DIFFUSE_AND_GLOSSY;
+    this->calcNormal(rec);
+    this->calcST(rec);
+
+}
+
 glm::vec3 MeshTriangle::evalDiffuseColor(const glm::vec2 &stCoords) const
 {
 
@@ -216,16 +230,11 @@ glm::vec3 MeshTriangle::gaussianNoise(const glm::vec2 &st) {
     return glm::vec3(dist(generator), dist(generator), dist(generator));
 }
 
+
 glm::vec3 MeshTriangle::checkerPattern(const glm::vec2 &st)
 {
-    float scale =10;
-//        float sines = sin(10 * st.x) * sin(10 * st.y);
-//        if (sines < 0) {
-//            return glm::vec3(0.0f);
-//        }
-//        else {
-//            return glm::vec3(1.0f);
-//        }
+    float scale =5;
+
     //pattern is a checkerboard pattern, so we need to get the integer part of the st coordinates
     //and then we need to check if the sum of the integer parts is even or odd
     //if the sum is even, then we return white, otherwise we return black
@@ -240,9 +249,9 @@ glm::vec3 MeshTriangle::checkerPattern(const glm::vec2 &st)
         return glm::vec3(0.937, 0.937, 0.231);
     }
 
-    //        float pattern = (fmodf(st.x * scale, 1) > 0.5f) ^ (fmodf(st.y * scale, 1) > 0.5);
-//        return mix(
-//                glm::vec3(0.815, 0.235, 0.031),
-//                glm::vec3(0.937, 0.937, 0.231),
-//                pattern);
+//    float pattern = (fmodf(st.x * scale, 1) > 0.5f) ^ (fmodf(st.y * scale, 1) > 0.5);
+//    return mix(
+//        glm::vec3(0.815, 0.235, 0.031),
+//        glm::vec3(0.937, 0.937, 0.231),
+//        pattern);
 }

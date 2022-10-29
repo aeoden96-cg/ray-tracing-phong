@@ -19,6 +19,11 @@ const float kInfinity = std::numeric_limits<float>::max();
 
 enum MaterialType { DIFFUSE_AND_GLOSSY, REFLECTION_AND_REFRACTION, REFLECTION , METAL};
 
+typedef std::vector<glm::vec3> PointList;
+//    typedef std::vector<PointList> PatchList;
+typedef std::vector<unsigned > IndexList;
+typedef std::vector<glm::vec2> TexSTList;
+
 /*struct Material
 {
     MaterialType type;
