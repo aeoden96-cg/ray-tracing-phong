@@ -61,6 +61,10 @@ private:
 
     void calcNormal(hit_record& rec) const;
     void calcST(hit_record& rec) const;
+
+    void initVertices(UniqPointList& vertices_in,
+                      unsigned maxVertIndex);
+    void initVertIndices();
 };
 
 

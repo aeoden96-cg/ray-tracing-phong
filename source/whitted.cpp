@@ -567,6 +567,82 @@ void createPolyTeapot(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable
     }
 }
 
+void loadPolyMeshFromFile(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable>> &objects)
+{
+    std::ifstream ifs;
+    try {
+        ifs.open("cow.geo");
+        if (ifs.fail()) throw;
+        std::stringstream ss;
+        ss << ifs.rdbuf();
+        uint32_t numFaces;
+        ss >> numFaces;
+        std::cout << "numFaces: " << numFaces << std::endl;
+//        std::unique_ptr<uint32_t []> faceIndex(new uint32_t[numFaces]);
+//        std::vector<uint32_t> faceIndex(numFaces);
+        std::unique_ptr<std::vector<uint32_t>> faceIndex = std::make_unique<std::vector<uint32_t>>(numFaces);
+
+        uint32_t vertsIndexArraySize = 0;
+        // reading face index array
+        for (uint32_t i = 0; i < numFaces; ++i) {
+            ss >> faceIndex->at(i);
+            vertsIndexArraySize += faceIndex->at(i);
+        }
+//        std::unique_ptr<uint32_t []> vertsIndex(new uint32_t[vertsIndexArraySize]);
+//        std::vector<uint32_t> vertsIndex(vertsIndexArraySize);
+        std::unique_ptr<std::vector<uint32_t>> vertsIndex = std::make_unique<std::vector<uint32_t>>(vertsIndexArraySize);
+        uint32_t vertsArraySize = 0;
+        // reading vertex index array
+        for (uint32_t i = 0; i < vertsIndexArraySize; ++i) {
+            ss >> vertsIndex->at(i);
+            if (vertsIndex->at(i) > vertsArraySize) vertsArraySize = vertsIndex->at(i);
+        }
+        vertsArraySize += 1;
+        // reading vertices
+//        std::unique_ptr<glm::vec3 []> verts(new glm::vec3[vertsArraySize]);
+//        std::vector<glm::vec3> verts(vertsArraySize);
+        std::unique_ptr<std::vector<glm::vec3>> verts = std::make_unique<std::vector<glm::vec3>>(vertsArraySize);
+        for (uint32_t i = 0; i < vertsArraySize; ++i) {
+            ss >> verts->at(i).x >> verts->at(i).y >> verts->at(i).z;
+        }
+        // reading normals
+//        std::unique_ptr<glm::vec3 []> normals(new glm::vec3[vertsIndexArraySize]);
+//        std::vector<glm::vec3> normals(vertsIndexArraySize);
+        std::unique_ptr<std::vector<glm::vec3>> normals = std::make_unique<std::vector<glm::vec3>>(vertsIndexArraySize);
+        for (uint32_t i = 0; i < vertsIndexArraySize; ++i) {
+            ss >> normals->at(i).x >> normals->at(i).y >> normals->at(i).z;
+        }
+        // reading st coordinates
+//        std::unique_ptr<glm::vec2 []> st(new glm::vec2[vertsIndexArraySize]);
+//        std::vector<glm::vec2> st(vertsIndexArraySize);
+        std::unique_ptr<std::vector<glm::vec2>> st = std::make_unique<std::vector<glm::vec2>>(vertsIndexArraySize);
+        for (uint32_t i = 0; i < vertsIndexArraySize; ++i) {
+            ss >> st->at(i).x >> st->at(i).y;
+        }
+
+        std::unique_ptr<MeshTriangle> meshTriangle =
+                std::make_unique<MeshTriangle>(
+                        verts,
+                        vertsIndex,
+                        st,
+                        faceIndex,
+                        normals,
+                        o2w);
+
+        meshTriangle->materialType = MaterialType::DIFFUSE_AND_GLOSSY;
+
+        meshTriangle->Kd = 0.5f;
+        meshTriangle->Ks = 0.5f;
+
+        objects.push_back(std::move(meshTriangle));
+    }
+    catch (...) {
+        std::cerr << "Error loading mesh from file " << std::endl;
+        ifs.close();
+    }
+    ifs.close();
+}
+
 
 int main()
 {
@@ -595,17 +671,18 @@ int main()
     //to translate it to the position (0, 0, 0), we need to translate it by (-0.5, -0.5, -0.5)
     glm::mat4 o2w = glm::translate(glm::mat4(1.0f), glm::vec3(-1 ,-3, -5));
     //to rotate it, we need to rotate it by 90 degrees around the x-axis
-    o2w = glm::rotate(o2w, glm::radians(-90.0f), glm::vec3(1, 0, 0));
     //to scale it, we need to scale it by 0.5
-    o2w = glm::scale(o2w, glm::vec3(0.7, 0.7, 0.7));
+    o2w = glm::scale(o2w, glm::vec3(0.3, 0.3, 0.3));
 
 
-    createPolyTeapot(o2w, objects);
+//    createPolyTeapot(o2w, objects);
 //    createCurveGeometry(objects);
 
 
     std::cout << "Created poly teapot,which has " << objects.size() - numOfObjects << " objects" << std::endl;
 
+
+    loadPolyMeshFromFile(o2w,objects);
 
     lights.push_back(std::make_unique<Light>(glm::vec3(0,4,-11), glm::vec3(1,1,1)));
 //    lights.push_back(std::make_unique<Light>(glm::vec3(0,0,5), glm::vec3(1,1,1)));

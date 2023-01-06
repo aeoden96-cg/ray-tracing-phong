@@ -3,12 +3,29 @@
 #include <memory>
 
 
+void MeshTriangle::initVertices(
+        UniqPointList& vertices_in,
+        unsigned maxVertIndex
+        ) {
+    this->vertices = std::make_unique<PointList>(maxVertIndex);
+
+    for (uint32_t i = 0; i < maxVertIndex; ++i) {
+        multVecMatrix(vertices_in->at(i), this->vertices->at(i), objectToWorld);
+    }
+
+}
+
+void MeshTriangle::initVertIndices() {
+
+}
+
+
 MeshTriangle::MeshTriangle(
-    std::unique_ptr<std::vector<glm::vec3>>& vertices_in,
-    std::unique_ptr<std::vector<unsigned int>>& vertIndices_in,
-    std::unique_ptr<std::vector<glm::vec2>>& st_in,
-    std::unique_ptr<std::vector<unsigned int>>& faceIndices_in,
-    std::unique_ptr<std::vector<glm::vec3>>& normals_in,
+        UniqPointList& vertices_in,
+        UniqIndexList& vertIndices_in,
+        UniqTexList& st_in,
+        UniqIndexList& faceIndices_in,
+        UniqPointList& normals_in,
     const glm::mat4 &o2w,
     bool singleVertAttr) :
         Hittable(o2w),
@@ -30,17 +47,8 @@ MeshTriangle::MeshTriangle(
     }
     maxVertIndex += 1;
 
-    // allocate memory to store the position of the mesh vertices
-//    std::cout << "maxVertIndex: " << maxVertIndex << std::endl;
-//    std::cout << "numTris: " << numTris << std::endl;
-//    std::cout << vertices.size() << std::endl;
+    this->initVertices(vertices_in, maxVertIndex);
 
-    this->vertices = std::make_unique<std::vector<glm::vec3>>(maxVertIndex);
-
-
-    for (uint32_t i = 0; i < maxVertIndex; ++i) {
-        multVecMatrix(vertices_in->at(i), this->vertices->at(i), objectToWorld);
-    }
 
     // allocate memory to store triangle indices
     this->vertIndices = std::make_unique<std::vector<glm::vec3>>(numTris);
@@ -55,6 +63,10 @@ MeshTriangle::MeshTriangle(
     // [/comment]
     unsigned nfaces = faceIndices_in->size();
 
+
+    //isSingleVertAttr is true by default
+    //if isSingleVertAttr is true, then we have 1 vertex attribute per vertex per face
+    //if isSingleVertAttr is false, then we have 1 vertex attribute per vertex
     if (isSingleVertAttr) {
         this->N = std::make_unique<std::vector<glm::vec3>>(maxVertIndex);
         this->st = std::make_unique<std::vector<glm::vec2>>(maxVertIndex);
@@ -255,3 +267,4 @@ glm::vec3 MeshTriangle::checkerPattern(const glm::vec2 &st)
 //        glm::vec3(0.937, 0.937, 0.231),
 //        pattern);
 }
+
