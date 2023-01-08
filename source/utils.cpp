@@ -149,7 +149,7 @@ void multDirMatrix(const glm::vec3 &src, glm::vec3 &dst,glm::mat4& x)
     dst.z = c;
 }
 
-void multVecMatrix(const glm::vec3 &src, glm::vec3 &dst,glm::mat4& x)
+void multVecMatrix(const glm::vec3 &src, glm::vec3 &dst, const glm::mat4& x)
 {
     float a, b, c, w;
 

@@ -82,7 +82,7 @@ HittableList loadSceneFromFile(const std::string& filename) {
             vertices.emplace_back(glm::vec3(down_right_v[0], down_right_v[1], down_right_v[2]));
             vertices.emplace_back(glm::vec3(down_left_v[0], down_left_v[1], down_left_v[2]));
 
-            std::vector<glm::vec3> vertIndices;
+            std::vector<glm::ivec3> vertIndices;
             vertIndices.emplace_back(glm::vec3(0, 1, 3));
             vertIndices.emplace_back(glm::vec3(1, 2, 3));
 
@@ -92,7 +92,7 @@ HittableList loadSceneFromFile(const std::string& filename) {
             uvIndices.emplace_back(glm::vec2(1, 1));
             uvIndices.emplace_back(glm::vec2(0, 1));
 
-    
+
             objects.emplace_back(std::make_unique<MeshTriangle>(
                     vertices, vertIndices, uvIndices));
 
@@ -105,7 +105,6 @@ HittableList loadSceneFromFile(const std::string& filename) {
 
     return objects;
 }
-
 
 
 // Returns true if the ray intersects a Hittable, false otherwise.
@@ -272,6 +271,16 @@ glm::vec3 castRay(
                     lights);
 
                 hitColor = reflectionColor * kr;
+                break;
+            }
+            case COW:
+            {
+                float NdotView = std::max(0.f, glm::dot(N, -dir));
+                const int M = 10;
+                float checker = (fmod(st.x * M, 1.0f) > 0.5f) ^ (fmod(st.y * M, 1.0f) < 0.5f);
+                float c = 0.3 * (1 - checker) + 0.7 * checker;
+
+                hitColor = { c * NdotView,c * NdotView,c * NdotView }; //Vec3f(uv.x, uv.y, 0);
                 break;
             }
             default:
@@ -501,7 +510,6 @@ void render(
 //
 
 
-
 void createPolyTeapot(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable>> &objects)
 {
     uint32_t divs = 8;
@@ -560,87 +568,82 @@ void createPolyTeapot(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable
                         o2w,
                         divs * divs);
 
-        meshTriangle->materialType = MaterialType::DIFFUSE_AND_GLOSSY;
+        meshTriangle->materialType = MaterialType::COW;
 
 
         objects.push_back(std::move(meshTriangle));
     }
 }
 
+
+
+
 void loadPolyMeshFromFile(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable>> &objects)
 {
     std::ifstream ifs;
-    try {
-        ifs.open("cow.geo");
-        if (ifs.fail()) throw;
-        std::stringstream ss;
-        ss << ifs.rdbuf();
-        uint32_t numFaces;
-        ss >> numFaces;
-        std::cout << "numFaces: " << numFaces << std::endl;
-//        std::unique_ptr<uint32_t []> faceIndex(new uint32_t[numFaces]);
-//        std::vector<uint32_t> faceIndex(numFaces);
-        std::unique_ptr<std::vector<uint32_t>> faceIndex = std::make_unique<std::vector<uint32_t>>(numFaces);
 
-        uint32_t vertsIndexArraySize = 0;
-        // reading face index array
-        for (uint32_t i = 0; i < numFaces; ++i) {
-            ss >> faceIndex->at(i);
-            vertsIndexArraySize += faceIndex->at(i);
-        }
-//        std::unique_ptr<uint32_t []> vertsIndex(new uint32_t[vertsIndexArraySize]);
-//        std::vector<uint32_t> vertsIndex(vertsIndexArraySize);
-        std::unique_ptr<std::vector<uint32_t>> vertsIndex = std::make_unique<std::vector<uint32_t>>(vertsIndexArraySize);
-        uint32_t vertsArraySize = 0;
-        // reading vertex index array
-        for (uint32_t i = 0; i < vertsIndexArraySize; ++i) {
-            ss >> vertsIndex->at(i);
-            if (vertsIndex->at(i) > vertsArraySize) vertsArraySize = vertsIndex->at(i);
-        }
-        vertsArraySize += 1;
-        // reading vertices
-//        std::unique_ptr<glm::vec3 []> verts(new glm::vec3[vertsArraySize]);
-//        std::vector<glm::vec3> verts(vertsArraySize);
-        std::unique_ptr<std::vector<glm::vec3>> verts = std::make_unique<std::vector<glm::vec3>>(vertsArraySize);
-        for (uint32_t i = 0; i < vertsArraySize; ++i) {
-            ss >> verts->at(i).x >> verts->at(i).y >> verts->at(i).z;
-        }
-        // reading normals
-//        std::unique_ptr<glm::vec3 []> normals(new glm::vec3[vertsIndexArraySize]);
-//        std::vector<glm::vec3> normals(vertsIndexArraySize);
-        std::unique_ptr<std::vector<glm::vec3>> normals = std::make_unique<std::vector<glm::vec3>>(vertsIndexArraySize);
-        for (uint32_t i = 0; i < vertsIndexArraySize; ++i) {
-            ss >> normals->at(i).x >> normals->at(i).y >> normals->at(i).z;
-        }
-        // reading st coordinates
-//        std::unique_ptr<glm::vec2 []> st(new glm::vec2[vertsIndexArraySize]);
-//        std::vector<glm::vec2> st(vertsIndexArraySize);
-        std::unique_ptr<std::vector<glm::vec2>> st = std::make_unique<std::vector<glm::vec2>>(vertsIndexArraySize);
-        for (uint32_t i = 0; i < vertsIndexArraySize; ++i) {
-            ss >> st->at(i).x >> st->at(i).y;
-        }
-
-        std::unique_ptr<MeshTriangle> meshTriangle =
-                std::make_unique<MeshTriangle>(
-                        verts,
-                        vertsIndex,
-                        st,
-                        faceIndex,
-                        normals,
-                        o2w);
-
-        meshTriangle->materialType = MaterialType::DIFFUSE_AND_GLOSSY;
-
-        meshTriangle->Kd = 0.5f;
-        meshTriangle->Ks = 0.5f;
-
-        objects.push_back(std::move(meshTriangle));
+    ifs.open("cow.geo");
+    if (ifs.fail()) throw;
+    std::stringstream ss;
+    ss << ifs.rdbuf();
+    uint32_t numFaces;
+    ss >> numFaces;
+    std::unique_ptr<std::vector<uint32_t>> faceIndex(new std::vector<uint32_t>(numFaces));
+    uint32_t vertsIndexArraySize = 0;
+    // reading face index array
+    for (uint32_t i = 0; i < numFaces; ++i) {
+        ss >> faceIndex->at(i);
+        vertsIndexArraySize += faceIndex->at(i);
     }
-    catch (...) {
-        std::cerr << "Error loading mesh from file " << std::endl;
-        ifs.close();
+    std::cout << "numFaces: " << numFaces << std::endl;
+
+    std::unique_ptr<std::vector<uint32_t>> vertsIndex(new std::vector<uint32_t>(vertsIndexArraySize));
+    uint32_t vertsArraySize = 0;
+    // reading vertex index array
+    for (uint32_t i = 0; i < vertsIndexArraySize; ++i) {
+        ss >> vertsIndex->at(i);
+        if (vertsIndex->at(i) > vertsArraySize) vertsArraySize = vertsIndex->at(i);
     }
+    std::cout << "vertsIndexArraySize: " << vertsIndexArraySize << std::endl;
+
+    vertsArraySize += 1;
+    // reading vertices
+    std::unique_ptr<std::vector<glm::vec3>> verts(new std::vector<glm::vec3>(vertsArraySize));
+    for (uint32_t i = 0; i < vertsArraySize; ++i) {
+        ss >> verts->at(i).x >> verts->at(i).y >> verts->at(i).z;
+        // o2w is the object to world transform
+        glm::vec3 res;
+        multVecMatrix(verts->at(i), res, o2w);
+        verts->at(i) = res;
+    }
+    std::cout << "vertsArraySize: " << vertsArraySize << std::endl;
+
+    // reading normals
+    std::unique_ptr<std::vector<glm::vec3>> normals(new std::vector<glm::vec3>(vertsIndexArraySize));
+    for (uint32_t i = 0; i < vertsIndexArraySize; ++i) {
+        ss >> normals->at(i).x >> normals->at(i).y >> normals->at(i).z;
+    }
+    std::cout << "normalsArraySize: " << vertsArraySize << std::endl;
+
+    // reading st coordinates
+    std::unique_ptr<std::vector<glm::vec2>> st(new std::vector<glm::vec2>(vertsIndexArraySize));
+    for (uint32_t i = 0; i < vertsIndexArraySize; ++i) {
+        ss >> st->at(i).x >> st->at(i).y;
+    }
+    std::cout << "stArraySize: " << vertsArraySize << std::endl;
+
     ifs.close();
+
+
+    std::unique_ptr<MeshTriangle> meshTriangle =
+                std::make_unique<MeshTriangle>(
+                        numFaces, faceIndex, vertsIndex, verts, normals, st);
+
+    meshTriangle->materialType = MaterialType::COW;
+
+    objects.push_back(std::move(meshTriangle));
+
+
 }
 
 
@@ -653,13 +656,10 @@ int main()
     std::vector<std::unique_ptr<Light>> lights;
 
     auto fileName = config["scene"].as<std::string>();
-
     YAML::Node input = YAML::LoadFile(fileName + ".yaml");
-
     objects = loadSceneFromFile(fileName);
 
     unsigned numOfObjects = objects.size();
-
     std::cout << "Loaded " << numOfObjects << " objects" << std::endl;
 
 
@@ -669,28 +669,35 @@ int main()
     //in this case, the object is the teapot, and the world is the scene
     //the teapot is centered at the origin, so we need to translate it to the position we want
     //to translate it to the position (0, 0, 0), we need to translate it by (-0.5, -0.5, -0.5)
-    glm::mat4 o2w = glm::translate(glm::mat4(1.0f), glm::vec3(-1 ,-3, -5));
+
+
+    glm::mat4 o2w = glm::translate(glm::mat4(1.0f), glm::vec3(3 ,-5, -7));
     //to rotate it, we need to rotate it by 90 degrees around the x-axis
+    o2w = glm::rotate(o2w, glm::radians(-90.0f), glm::vec3(1, 0, 0));
+    o2w = glm::rotate(o2w, glm::radians(-70.0f), glm::vec3(0, 0, 1));
     //to scale it, we need to scale it by 0.5
-    o2w = glm::scale(o2w, glm::vec3(0.3, 0.3, 0.3));
+    o2w = glm::scale(o2w, glm::vec3(0.7, 0.7, 0.7));
 
 
-//    createPolyTeapot(o2w, objects);
+    createPolyTeapot(o2w, objects);
 //    createCurveGeometry(objects);
 
 
     std::cout << "Created poly teapot,which has " << objects.size() - numOfObjects << " objects" << std::endl;
 
 
+    o2w = glm::translate(glm::mat4(1.0f), glm::vec3(-3, -5, -8));
+    o2w = glm::scale(o2w, glm::vec3(0.5, 0.5, 0.5));
+
     loadPolyMeshFromFile(o2w,objects);
 
     lights.push_back(std::make_unique<Light>(glm::vec3(0,4,-11), glm::vec3(1,1,1)));
-//    lights.push_back(std::make_unique<Light>(glm::vec3(0,0,5), glm::vec3(1,1,1)));
+    lights.push_back(std::make_unique<Light>(glm::vec3(0,0,5), glm::vec3(1,1,1)));
 
     // setting up options
     Options options{};
-    options.width = 200;
-    options.height = 200;
+    options.width = 100;
+    options.height = 100;
     options.fov = 80;
     options.backgroundColor = glm::vec3(0.235294, 0.67451, 0.843137);
     options.maxDepth = 2;
@@ -699,8 +706,8 @@ int main()
     //it is the matrix that transforms from world space to camera space
     //we create it by rotating around the y-axis by 180 degrees and then translating by (0,0,5)
     options.cameraToWorld = glm::mat4(1.0f);
-    //options.cameraToWorld = glm::translate(options.cameraToWorld, glm::vec3(0,1,5));
-    //options.cameraToWorld = glm::rotate(options.cameraToWorld, glm::radians(50.0f), glm::vec3(0,1,0));
+//    options.cameraToWorld = glm::translate(options.cameraToWorld, glm::vec3(17,7,15));
+//    options.cameraToWorld = glm::rotate(options.cameraToWorld, glm::radians(50.0f), glm::vec3(0,1,0));
 
     // finally, render
     render(options, objects, lights);

@@ -15,10 +15,79 @@ void MeshTriangle::initVertices(
 
 }
 
-void MeshTriangle::initVertIndices() {
 
+
+MeshTriangle::MeshTriangle(
+        const uint32_t numFaces,
+        const std::unique_ptr<std::vector<uint32_t>> &faceIndex,
+        const std::unique_ptr<std::vector<uint32_t>> &vertsIndex,
+        const std::unique_ptr<std::vector<glm::vec3>> &verts,
+        std::unique_ptr<std::vector<glm::vec3>> &normals,
+        std::unique_ptr<std::vector<glm::vec2>> &st):
+        meshType(MeshType::FILE)
+{
+    int numTris = 0;
+    uint32_t k = 0, maxVertIndex = 0;
+    // find out how many triangles we need to create for this mesh
+    for (uint32_t i = 0; i < numFaces; ++i) {
+        numTris += faceIndex->at(i) - 2;
+        for (uint32_t j = 0; j < faceIndex->at(i); ++j)
+            if (vertsIndex->at(k + j) > maxVertIndex)
+                maxVertIndex = vertsIndex->at(k + j);
+        k += faceIndex->at(i);
+    }
+    maxVertIndex += 1;
+
+    // allocate memory to store the position of the mesh vertices
+//        P = std::unique_ptr<Vec3f []>(new Vec3f[maxVertIndex]);
+    vertices = std::make_unique<std::vector<glm::vec3>>(maxVertIndex);
+    for (uint32_t i = 0; i < maxVertIndex; ++i) {
+        vertices->at(i) = verts->at(i);
+    }
+
+    // allocate memory to store triangle indices
+//        trisIndex = std::unique_ptr<uint32_t []>(new uint32_t [numTris * 3]);
+//    trisIndex = std::make_unique<std::vector<uint32_t>>(numTris * 3);
+    vertIndices = std::make_unique<std::vector<glm::ivec3>>(numTris);
+    uint32_t l = 0;
+    // [comment]
+    // Generate the triangle index array
+    // Keep in mind that there is generally 1 vertex attribute for each vertex of each face.
+    // So for example if you have 2 quads, you only have 6 vertices but you have 2 * 4
+    // vertex attributes (that is 8 normals, 8 texture coordinates, etc.). So the easiest
+    // lazziest method in our triangle mesh, is to create a new array for each supported
+    // vertex attribute (st, normals, etc.) whose size is equal to the number of triangles
+    // multiplied by 3, and then set the value of the vertex attribute at each vertex
+    // of each triangle using the input array (normals[], st[], etc.)
+    // [/comment]
+//        N = std::unique_ptr<Vec3f []>(new Vec3f[numTris * 3]);
+    N = std::make_unique<std::vector<glm::vec3>>(numTris * 3);
+//      texCoordinates = std::unique_ptr<Vec2f []>(new Vec2f[numTris * 3]);
+    this->st = std::make_unique<std::vector<glm::vec2>>(numTris * 3);
+
+
+
+    for (uint32_t i = 0, k = 0; i < numFaces; ++i) { // for each  face
+        for (uint32_t j = 0; j < faceIndex->at(i) - 2; ++j) { // for each triangle in the face
+//            trisIndex->at(l) = vertsIndex->at(k);
+//            trisIndex->at(l + 1) = vertsIndex->at(k + j + 1);
+//            trisIndex->at(l + 2) = vertsIndex->at(k + j + 2);
+            vertIndices->at(l / 3) = glm::ivec3(vertsIndex->at(k), vertsIndex->at(k + j + 1), vertsIndex->at(k + j + 2));
+
+            N->at(l) = normals->at(k);
+            N->at(l + 1) = normals->at(k + j + 1);
+            N->at(l + 2) = normals->at(k + j + 2);
+            this->st->at(l) = st->at(k);
+            this->st->at(l + 1) = st->at(k + j + 1);
+            this->st->at(l + 2) = st->at(k + j + 2);
+            l += 3;
+        }
+        k += faceIndex->at(i);
+    }
+    // you can use move if the input geometry is already triangulated
+    //N = std::move(normals); // transfer ownership
+    //sts = std::move(st); // transfer ownership
 }
-
 
 MeshTriangle::MeshTriangle(
         UniqPointList& vertices_in,
@@ -26,10 +95,11 @@ MeshTriangle::MeshTriangle(
         UniqTexList& st_in,
         UniqIndexList& faceIndices_in,
         UniqPointList& normals_in,
-    const glm::mat4 &o2w,
-    bool singleVertAttr) :
+        const glm::mat4 &o2w,
+        bool singleVertAttr) :
         Hittable(o2w),
-        isSingleVertAttr(singleVertAttr)
+        isSingleVertAttr(singleVertAttr),
+        meshType(MeshType::POT)
 {
     unsigned numTris = 0;
 
@@ -51,7 +121,7 @@ MeshTriangle::MeshTriangle(
 
 
     // allocate memory to store triangle indices
-    this->vertIndices = std::make_unique<std::vector<glm::vec3>>(numTris);
+    this->vertIndices = std::make_unique<std::vector<glm::ivec3>>(numTris);
 
     glm::mat4 transformNormals = glm::transpose(worldToObject);
     // [comment]
@@ -105,7 +175,7 @@ MeshTriangle::MeshTriangle(
                     vertIndices_in->at(k),
                     vertIndices_in->at(k + j + 1),
                     vertIndices_in->at(k + j + 2)
-                    );
+            );
             l += 1;
         }
         k += faceIndices_in->at(i);
@@ -121,22 +191,21 @@ bool MeshTriangle::intersect(
         hit_record& rec
 ) const
 {
-    int k = 0;
     bool intersect = false;
-
-    for (const glm::vec3& triangle : *this->vertIndices) {
-        const glm::vec3 & v0 = this->vertices->at(triangle.x);
-        const glm::vec3 & v1 = this->vertices->at(triangle.y);
-        const glm::vec3 & v2 = this->vertices->at(triangle.z);
+    uint32_t j = 0;
+    for (uint32_t i = 0; i < vertIndices->size(); ++i) {
+        glm::vec3 v0 = vertices->at(vertIndices->at(i).x);
+        glm::vec3 v1 = vertices->at(vertIndices->at(i).y);
+        glm::vec3 v2 = vertices->at(vertIndices->at(i).z);
         float t, u, v;
         if (rayTriangleIntersect(v0, v1, v2, orig, dir, t, u, v) && t < tnear) {
             tnear = t;
             uv.x = u;
             uv.y = v;
-            index = k;
+            index = i;
             intersect = true;
         }
-        k++;
+        j += 3;
     }
     return intersect;
 }
@@ -152,6 +221,14 @@ void MeshTriangle::calcNormal(hit_record& rec) const{
 
     //isSingleVertAttr is a boolean that tells us if we have 1 vertex attribute per vertex per face
     //or 1 vertex attribute per vertex
+
+    glm::vec3 v01 = vertices->at(vertIndices->at(rec.triIndex).x);
+    glm::vec3 v11 = vertices->at(vertIndices->at(rec.triIndex).y);
+    glm::vec3 v21 = vertices->at(vertIndices->at(rec.triIndex).z);
+
+    rec.normal = glm::normalize(glm::cross(v11 - v01, v21 - v01));
+
+    return;
 
     if (isSingleVertAttr) {
         triangle = vertIndices->at(rec.triIndex);
@@ -187,28 +264,25 @@ void MeshTriangle::calcNormal(hit_record& rec) const{
 }
 
 void MeshTriangle::calcST(hit_record& rec) const{
-    auto triangle = vertIndices->at(rec.triIndex);
 
-    //now we need to get the st coordinates of the triangle
-    //st coordinates are the texture coordinates
-    //we need to interpolate the st coordinates of the triangle
-    //based on the uv coordinates of the intersection point
+    if (meshType == MeshType::QUAD) {
 
-    //now we need to get the normal of the triangle using the cross product of e0 and e1
-    //this is the same as the normal of the plane that the triangle lies on
+        auto triangle = vertIndices->at(rec.triIndex);
 
+        const glm::vec2 &st0 = st->at(triangle.x);
+        const glm::vec2 &st1 = st->at(triangle.y);
+        const glm::vec2 &st2 = st->at(triangle.z);
 
-    //--------------------st coordinates-------------------
+        rec.st = st0 * (1 - rec.uv.x - rec.uv.y) + st1 * rec.uv.x + st2 * rec.uv.y;
+    }
+    else if( meshType == MeshType::FILE)
+    {
+        glm::vec2 st01 = st->at(rec.triIndex * 3);
+        glm::vec2 st11 = st->at(rec.triIndex * 3 + 1);
+        glm::vec2 st21 = st->at(rec.triIndex * 3 + 2);
+        rec.st = (1 - rec.uv.x - rec.uv.y) * st01 + rec.uv.x * st11 + rec.uv.y * st21;
+    }
 
-    const glm::vec2 &st0 = st->at(triangle.x);
-    const glm::vec2 &st1 = st->at(triangle.y);
-    const glm::vec2 &st2 = st->at(triangle.z);
-
-    //now we need to interpolate the st coordinates of the triangle
-    //based on the uv coordinates of the intersection point
-    //we can do this by using the barycentric coordinates of the intersection point
-    //we can get the barycentric coordinates of the intersection point by using the uv coordinate
-    rec.st = st0 * (1 - rec.uv.x - rec.uv.y) + st1 * rec.uv.x + st2 * rec.uv.y;
 
 }
 

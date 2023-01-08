@@ -17,7 +17,7 @@
 
 const float kInfinity = std::numeric_limits<float>::max();
 
-enum MaterialType { DIFFUSE_AND_GLOSSY, REFLECTION_AND_REFRACTION, REFLECTION , METAL};
+enum MaterialType { DIFFUSE_AND_GLOSSY, REFLECTION_AND_REFRACTION, REFLECTION , METAL , COW };
 
 //    typedef std::vector<PointList> PatchList;
 typedef std::vector<glm::vec3> PointList;
@@ -91,7 +91,7 @@ glm::vec3 refract(const glm::vec3 &I, const glm::vec3 &N, const float &ior);
 // \param[out] kr is the amount of light reflected
 float fresnel(const glm::vec3 &I, const glm::vec3 &N, const float &ior);
 
-void multVecMatrix(const glm::vec3 &src, glm::vec3 &dst,glm::mat4& x);
+void multVecMatrix(const glm::vec3 &src, glm::vec3 &dst,const glm::mat4& x);
 
 void multDirMatrix(const glm::vec3 &src, glm::vec3 &dst,glm::mat4& x);
 
