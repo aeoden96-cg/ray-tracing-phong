@@ -87,6 +87,20 @@ MeshTriangle::MeshTriangle(
     // you can use move if the input geometry is already triangulated
     //N = std::move(normals); // transfer ownership
     //sts = std::move(st); // transfer ownership
+
+
+    std::cout << "Loaded: -------------" << std::endl;
+    std::cout << "  " <<  vertices->size() << " vertices" << std::endl;
+    std::cout << "  " <<  vertIndices->size() << " triangle indices" << std::endl;
+    std::cout << "  " <<  N->size() << " normals" << std::endl;
+    std::cout << "  " <<  this->st->size() << " texture coordinates" << std::endl;
+
+    std:: cout <<  "  "<<"Mesh type: " << int(meshType) << std::endl;
+    std:: cout <<  "  "<<"smoothShading: " << smoothShading << std::endl;
+    std:: cout <<  "  "<<"isSingleVertAttr: " << isSingleVertAttr << std::endl;
+
+    std::cout << "-------------------" << std::endl;
+
 }
 
 MeshTriangle::MeshTriangle(
@@ -180,6 +194,18 @@ MeshTriangle::MeshTriangle(
         }
         k += faceIndices_in->at(i);
     }
+
+    std::cout << "Loaded: -------------" << std::endl;
+    std::cout << "  " <<  vertices->size() << " vertices" << std::endl;
+    std::cout << "  " <<  vertIndices->size() << " triangle indices" << std::endl;
+    std::cout << "  " <<  N->size() << " normals" << std::endl;
+    std::cout << "  " <<  this->st->size() << " texture coordinates" << std::endl;
+
+    std:: cout <<  "  "<<"Mesh type: " << int(meshType) << std::endl;
+    std:: cout <<  "  "<<"smoothShading: " << smoothShading << std::endl;
+    std:: cout <<  "  "<<"isSingleVertAttr: " << isSingleVertAttr << std::endl;
+
+    std::cout << "-------------------" << std::endl;
 }
 
 bool MeshTriangle::intersect(
@@ -213,52 +239,46 @@ bool MeshTriangle::intersect(
 
 void MeshTriangle::calcNormal(hit_record& rec) const{
     //first we need to get the triangle from the index
-    auto triangle = vertIndices->at(rec.triIndex);
 
-    //--------------------normal--------------------
-    //vai is vertex attribute index, which is the index of the vertex in the vertices array
-    //triIndex is the index of the triangle in the vertIndices array
+//
+//    //--------------------normal--------------------
+//    //vai is vertex attribute index, which is the index of the vertex in the vertices array
+//    //triIndex is the index of the triangle in the vertIndices array
+//
+//    //isSingleVertAttr is a boolean that tells us if we have 1 vertex attribute per vertex per face
+//    //or 1 vertex attribute per vertex
+//
+//    glm::vec3 v01 = vertices->at(vertIndices->at(rec.triIndex).x);
+//    glm::vec3 v11 = vertices->at(vertIndices->at(rec.triIndex).y);
+//    glm::vec3 v21 = vertices->at(vertIndices->at(rec.triIndex).z);
+//
+//    rec.normal = glm::normalize(glm::cross(v11 - v01, v21 - v01));
+//
+//    return;
 
-    //isSingleVertAttr is a boolean that tells us if we have 1 vertex attribute per vertex per face
-    //or 1 vertex attribute per vertex
-
-    glm::vec3 v01 = vertices->at(vertIndices->at(rec.triIndex).x);
-    glm::vec3 v11 = vertices->at(vertIndices->at(rec.triIndex).y);
-    glm::vec3 v21 = vertices->at(vertIndices->at(rec.triIndex).z);
-
-    rec.normal = glm::normalize(glm::cross(v11 - v01, v21 - v01));
-
-    return;
+    glm::ivec3 triangle;
 
     if (isSingleVertAttr) {
         triangle = vertIndices->at(rec.triIndex);
     }
     else {
-        triangle = glm::vec3(
-                rec.triIndex,
-                rec.triIndex,
-                rec.triIndex);
+        triangle = glm::vec3(rec.triIndex,rec.triIndex,rec.triIndex);
     }
 
     if (smoothShading) {
-        // vertex normal
         const glm::vec3 &n0 = N->at(triangle.x);
         const glm::vec3 &n1 = N->at(triangle.y);
         const glm::vec3 &n2 = N->at(triangle.z);
         rec.normal = (1 - rec.uv.x - rec.uv.y) * n0 + rec.uv.x * n1 + rec.uv.y * n2;
     }
     else {
-        // face normal
 
-        //now we need to get the vertices of the triangle
         const glm::vec3 & v0 = vertices->at(triangle.x);
         const glm::vec3 & v1 = vertices->at(triangle.y);
         const glm::vec3 & v2 = vertices->at(triangle.z);
         rec.normal = glm::cross((v1 - v0),(v2 - v0));
     }
 
-
-    // doesn't need to be normalized as the N's are normalized but just for safety
     rec.normal = glm::normalize(rec.normal);
 
 }

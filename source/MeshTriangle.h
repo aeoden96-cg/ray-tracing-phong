@@ -26,6 +26,20 @@ public:
         this->vertices = std::make_unique<std::vector<glm::vec3>>(vertices_in);
         this->vertIndices = std::make_unique<std::vector<glm::ivec3>>(vertIndices_in);
         this->st = std::make_unique<std::vector<glm::vec2>>(st_in);
+
+
+
+        std::cout << "Loaded: -------------" << std::endl;
+        std::cout << "  " <<  vertices->size() << " vertices" << std::endl;
+        std::cout << "  " <<  vertIndices->size() << " triangle indices" << std::endl;
+        std::cout << "  " << /* N->size()*/ 0 << " normals" << std::endl;
+        std::cout << "  " <<  this->st->size() << " texture coordinates" << std::endl;
+
+        std:: cout <<  "  "<<"Mesh type: " << int(meshType) << std::endl;
+        std:: cout <<  "  "<<"smoothShading: " << smoothShading << std::endl;
+        std:: cout <<  "  "<<"isSingleVertAttr: " << isSingleVertAttr << std::endl;
+
+        std::cout << "-------------------" << std::endl;
     }
 
 

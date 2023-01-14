@@ -40,6 +40,143 @@
 #include "yaml-cpp/yaml.h"
 //#include "PatchMesh.h"
 
+
+
+void createPolyTeapot(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable>> &objects)
+{
+    uint32_t divs = 8;
+
+    std::unique_ptr<PointList> verts = std::make_unique<PointList>((divs + 1) * (divs + 1));
+    std::unique_ptr<IndexList> faceIndices = std::make_unique<IndexList>(divs * divs);
+    std::unique_ptr<IndexList> vertIndices = std::make_unique<IndexList>(divs * divs * 4);
+    std::unique_ptr<PointList> normals = std::make_unique<PointList>((divs + 1) * (divs + 1));
+    std::unique_ptr<TexSTList> st = std::make_unique<TexSTList>((divs + 1) * (divs + 1));
+
+    // face connectivity - all patches are subdivided the same way so there
+    // share the same topology and uvs
+    for (unsigned j = 0, k = 0; j < divs; ++j) {
+        for (unsigned i = 0; i < divs; ++i, ++k) {
+            faceIndices->at(k) = 4;
+            vertIndices->at(k * 4) = (divs + 1) * j + i;
+            vertIndices->at(k * 4 + 1)  = (divs + 1) * j + i + 1;
+            vertIndices->at(k * 4 + 2)  = (divs + 1) * (j + 1) + i + 1;
+            vertIndices->at(k * 4 + 3)  = (divs + 1) * (j + 1) + i;
+        }
+    }
+
+    std::vector<glm::vec3> controlPoints(16);
+    for (auto & teapotPatch : teapotPatches) {  //kTeapotNumPatches
+        // set the control points for the current patch
+        for (auto tup : boost::combine(controlPoints, teapotPatch)) {
+            //boost:combine is a zip function, it combines two vectors into a tuple, which is then unpacked
+            glm::vec3 &cp = tup.get<0>();
+            unsigned &idx = tup.get<1>();
+            cp = teapotVertices[idx - 1];
+        }
+
+
+        // generate grid
+        for (unsigned j = 0, k = 0; j <= divs; ++j) {
+            float v = (float)j / (float)divs;
+            for (unsigned i = 0; i <= divs; ++i, ++k) {
+                float u = (float)i / (float)divs;
+                verts->at(k) = evalBezierPatch(controlPoints, u, v);
+                glm::vec3  dU = dUBezier(controlPoints, u, v);
+                glm::vec3  dV = dVBezier(controlPoints, u, v);
+                normals->at(k) = glm::normalize(glm::cross(dU, dV));
+                st->at(k).x = u;
+                st->at(k).y = v;
+            }
+        }
+
+
+        std::unique_ptr<MeshTriangle> meshTriangle =
+                std::make_unique<MeshTriangle>(
+                        verts,
+                        vertIndices,
+                        st,
+                        faceIndices,
+                        normals,
+                        o2w,
+                        divs * divs);
+
+        meshTriangle->materialType = MaterialType::COW;
+
+
+        objects.push_back(std::move(meshTriangle));
+    }
+}
+
+void loadPolyMeshFromFile(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable>> &objects)
+{
+    std::ifstream ifs;
+
+    ifs.open("cow.geo");
+    if (ifs.fail()) throw;
+    std::stringstream ss;
+    ss << ifs.rdbuf();
+    uint32_t numFaces;
+    ss >> numFaces;
+    std::unique_ptr<std::vector<uint32_t>> faceIndex(new std::vector<uint32_t>(numFaces));
+    uint32_t vertsIndexArraySize = 0;
+    // reading face index array
+    for (uint32_t i = 0; i < numFaces; ++i) {
+        ss >> faceIndex->at(i);
+        vertsIndexArraySize += faceIndex->at(i);
+    }
+//    std::cout << "numFaces: " << numFaces << std::endl;
+
+    std::unique_ptr<std::vector<uint32_t>> vertsIndex(new std::vector<uint32_t>(vertsIndexArraySize));
+    uint32_t vertsArraySize = 0;
+    // reading vertex index array
+    for (uint32_t i = 0; i < vertsIndexArraySize; ++i) {
+        ss >> vertsIndex->at(i);
+        if (vertsIndex->at(i) > vertsArraySize) vertsArraySize = vertsIndex->at(i);
+    }
+//    std::cout << "vertsIndexArraySize: " << vertsIndexArraySize << std::endl;
+
+    vertsArraySize += 1;
+    // reading vertices
+    std::unique_ptr<std::vector<glm::vec3>> verts(new std::vector<glm::vec3>(vertsArraySize));
+    for (uint32_t i = 0; i < vertsArraySize; ++i) {
+        ss >> verts->at(i).x >> verts->at(i).y >> verts->at(i).z;
+        // o2w is the object to world transform
+        glm::vec3 res;
+        multVecMatrix(verts->at(i), res, o2w);
+        verts->at(i) = res;
+    }
+//    std::cout << "vertsArraySize: " << vertsArraySize << std::endl;
+
+    // reading normals
+    std::unique_ptr<std::vector<glm::vec3>> normals(new std::vector<glm::vec3>(vertsIndexArraySize));
+    for (uint32_t i = 0; i < vertsIndexArraySize; ++i) {
+        ss >> normals->at(i).x >> normals->at(i).y >> normals->at(i).z;
+    }
+//    std::cout << "normalsArraySize: " << vertsArraySize << std::endl;
+
+    // reading st coordinates
+    std::unique_ptr<std::vector<glm::vec2>> st(new std::vector<glm::vec2>(vertsIndexArraySize));
+    for (uint32_t i = 0; i < vertsIndexArraySize; ++i) {
+        ss >> st->at(i).x >> st->at(i).y;
+    }
+//    std::cout << "stArraySize: " << vertsArraySize << std::endl;
+
+    ifs.close();
+
+
+    std::unique_ptr<MeshTriangle> meshTriangle =
+            std::make_unique<MeshTriangle>(
+                    numFaces, faceIndex, vertsIndex, verts, normals, st);
+
+    meshTriangle->materialType = MaterialType::COW;
+
+    objects.push_back(std::move(meshTriangle));
+
+
+}
+
+
+
 HittableList loadSceneFromFile(const std::string& filename) {
     YAML::Node config = YAML::LoadFile(filename + ".yaml");
 
@@ -96,7 +233,31 @@ HittableList loadSceneFromFile(const std::string& filename) {
             objects.emplace_back(std::make_unique<MeshTriangle>(
                     vertices, vertIndices, uvIndices));
 
+        } else if(type == "bezier") {
+            const auto numOfObjects = objects.size();
 
+            glm::mat4 o2w = glm::translate(glm::mat4(1.0f), glm::vec3(3 ,-5, -7));
+            //to rotate it, we need to rotate it by 90 degrees around the x-axis
+            o2w = glm::rotate(o2w, glm::radians(-90.0f), glm::vec3(1, 0, 0));
+            o2w = glm::rotate(o2w, glm::radians(-70.0f), glm::vec3(0, 0, 1));
+            //to scale it, we need to scale it by 0.5
+            o2w = glm::scale(o2w, glm::vec3(0.7, 0.7, 0.7));
+
+
+            createPolyTeapot(o2w, objects);
+            std::cout << "Created poly teapot, which has " << objects.size() - numOfObjects << " objects" << std::endl;
+
+
+        } else if(type == "mesh") {
+
+            const auto numOfObjects = objects.size();
+
+            glm::mat4  o2w = glm::translate(glm::mat4(1.0f), glm::vec3(-3, -5, -8));
+            o2w = glm::scale(o2w, glm::vec3(0.5, 0.5, 0.5));
+
+            loadPolyMeshFromFile(o2w,objects);
+
+            std::cout << "Created poly mesh, which has " << objects.size() - numOfObjects << " objects" << std::endl;
 
         } else {
             throw std::runtime_error("Unknown object type");
@@ -510,141 +671,7 @@ void render(
 //
 
 
-void createPolyTeapot(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable>> &objects)
-{
-    uint32_t divs = 8;
 
-    std::unique_ptr<PointList> verts = std::make_unique<PointList>((divs + 1) * (divs + 1));
-    std::unique_ptr<IndexList> faceIndices = std::make_unique<IndexList>(divs * divs);
-    std::unique_ptr<IndexList> vertIndices = std::make_unique<IndexList>(divs * divs * 4);
-    std::unique_ptr<PointList> normals = std::make_unique<PointList>((divs + 1) * (divs + 1));
-    std::unique_ptr<TexSTList> st = std::make_unique<TexSTList>((divs + 1) * (divs + 1));
-
-    // face connectivity - all patches are subdivided the same way so there
-    // share the same topology and uvs
-    for (unsigned j = 0, k = 0; j < divs; ++j) {
-        for (unsigned i = 0; i < divs; ++i, ++k) {
-            faceIndices->at(k) = 4;
-            vertIndices->at(k * 4) = (divs + 1) * j + i;
-            vertIndices->at(k * 4 + 1)  = (divs + 1) * j + i + 1;
-            vertIndices->at(k * 4 + 2)  = (divs + 1) * (j + 1) + i + 1;
-            vertIndices->at(k * 4 + 3)  = (divs + 1) * (j + 1) + i;
-        }
-    }
-
-    std::vector<glm::vec3> controlPoints(16);
-    for (auto & teapotPatch : teapotPatches) {  //kTeapotNumPatches
-        // set the control points for the current patch
-        for (auto tup : boost::combine(controlPoints, teapotPatch)) {
-            //boost:combine is a zip function, it combines two vectors into a tuple, which is then unpacked
-            glm::vec3 &cp = tup.get<0>();
-            unsigned &idx = tup.get<1>();
-            cp = teapotVertices[idx - 1];
-        }
-
-
-        // generate grid
-        for (unsigned j = 0, k = 0; j <= divs; ++j) {
-            float v = (float)j / (float)divs;
-            for (unsigned i = 0; i <= divs; ++i, ++k) {
-                float u = (float)i / (float)divs;
-                verts->at(k) = evalBezierPatch(controlPoints, u, v);
-                glm::vec3  dU = dUBezier(controlPoints, u, v);
-                glm::vec3  dV = dVBezier(controlPoints, u, v);
-                normals->at(k) = glm::normalize(glm::cross(dU, dV));
-                st->at(k).x = u;
-                st->at(k).y = v;
-            }
-        }
-
-
-        std::unique_ptr<MeshTriangle> meshTriangle =
-                std::make_unique<MeshTriangle>(
-                        verts,
-                        vertIndices,
-                        st,
-                        faceIndices,
-                        normals,
-                        o2w,
-                        divs * divs);
-
-        meshTriangle->materialType = MaterialType::COW;
-
-
-        objects.push_back(std::move(meshTriangle));
-    }
-}
-
-
-
-
-void loadPolyMeshFromFile(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable>> &objects)
-{
-    std::ifstream ifs;
-
-    ifs.open("cow.geo");
-    if (ifs.fail()) throw;
-    std::stringstream ss;
-    ss << ifs.rdbuf();
-    uint32_t numFaces;
-    ss >> numFaces;
-    std::unique_ptr<std::vector<uint32_t>> faceIndex(new std::vector<uint32_t>(numFaces));
-    uint32_t vertsIndexArraySize = 0;
-    // reading face index array
-    for (uint32_t i = 0; i < numFaces; ++i) {
-        ss >> faceIndex->at(i);
-        vertsIndexArraySize += faceIndex->at(i);
-    }
-    std::cout << "numFaces: " << numFaces << std::endl;
-
-    std::unique_ptr<std::vector<uint32_t>> vertsIndex(new std::vector<uint32_t>(vertsIndexArraySize));
-    uint32_t vertsArraySize = 0;
-    // reading vertex index array
-    for (uint32_t i = 0; i < vertsIndexArraySize; ++i) {
-        ss >> vertsIndex->at(i);
-        if (vertsIndex->at(i) > vertsArraySize) vertsArraySize = vertsIndex->at(i);
-    }
-    std::cout << "vertsIndexArraySize: " << vertsIndexArraySize << std::endl;
-
-    vertsArraySize += 1;
-    // reading vertices
-    std::unique_ptr<std::vector<glm::vec3>> verts(new std::vector<glm::vec3>(vertsArraySize));
-    for (uint32_t i = 0; i < vertsArraySize; ++i) {
-        ss >> verts->at(i).x >> verts->at(i).y >> verts->at(i).z;
-        // o2w is the object to world transform
-        glm::vec3 res;
-        multVecMatrix(verts->at(i), res, o2w);
-        verts->at(i) = res;
-    }
-    std::cout << "vertsArraySize: " << vertsArraySize << std::endl;
-
-    // reading normals
-    std::unique_ptr<std::vector<glm::vec3>> normals(new std::vector<glm::vec3>(vertsIndexArraySize));
-    for (uint32_t i = 0; i < vertsIndexArraySize; ++i) {
-        ss >> normals->at(i).x >> normals->at(i).y >> normals->at(i).z;
-    }
-    std::cout << "normalsArraySize: " << vertsArraySize << std::endl;
-
-    // reading st coordinates
-    std::unique_ptr<std::vector<glm::vec2>> st(new std::vector<glm::vec2>(vertsIndexArraySize));
-    for (uint32_t i = 0; i < vertsIndexArraySize; ++i) {
-        ss >> st->at(i).x >> st->at(i).y;
-    }
-    std::cout << "stArraySize: " << vertsArraySize << std::endl;
-
-    ifs.close();
-
-
-    std::unique_ptr<MeshTriangle> meshTriangle =
-                std::make_unique<MeshTriangle>(
-                        numFaces, faceIndex, vertsIndex, verts, normals, st);
-
-    meshTriangle->materialType = MaterialType::COW;
-
-    objects.push_back(std::move(meshTriangle));
-
-
-}
 
 
 int main()
@@ -664,40 +691,16 @@ int main()
 
 
 
-    //o2w is the object to world transformation
-    //it is the transformation that transforms the object from its local space to the world space
-    //in this case, the object is the teapot, and the world is the scene
-    //the teapot is centered at the origin, so we need to translate it to the position we want
-    //to translate it to the position (0, 0, 0), we need to translate it by (-0.5, -0.5, -0.5)
-
-
-    glm::mat4 o2w = glm::translate(glm::mat4(1.0f), glm::vec3(3 ,-5, -7));
-    //to rotate it, we need to rotate it by 90 degrees around the x-axis
-    o2w = glm::rotate(o2w, glm::radians(-90.0f), glm::vec3(1, 0, 0));
-    o2w = glm::rotate(o2w, glm::radians(-70.0f), glm::vec3(0, 0, 1));
-    //to scale it, we need to scale it by 0.5
-    o2w = glm::scale(o2w, glm::vec3(0.7, 0.7, 0.7));
-
-
-    createPolyTeapot(o2w, objects);
 //    createCurveGeometry(objects);
 
-
-    std::cout << "Created poly teapot,which has " << objects.size() - numOfObjects << " objects" << std::endl;
-
-
-    o2w = glm::translate(glm::mat4(1.0f), glm::vec3(-3, -5, -8));
-    o2w = glm::scale(o2w, glm::vec3(0.5, 0.5, 0.5));
-
-    loadPolyMeshFromFile(o2w,objects);
 
     lights.push_back(std::make_unique<Light>(glm::vec3(0,4,-11), glm::vec3(1,1,1)));
     lights.push_back(std::make_unique<Light>(glm::vec3(0,0,5), glm::vec3(1,1,1)));
 
     // setting up options
     Options options{};
-    options.width = 100;
-    options.height = 100;
+    options.width = 200;
+    options.height =200;
     options.fov = 80;
     options.backgroundColor = glm::vec3(0.235294, 0.67451, 0.843137);
     options.maxDepth = 2;
