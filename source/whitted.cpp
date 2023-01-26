@@ -168,7 +168,7 @@ void loadPolyMeshFromFile(const glm::mat4& o2w, std::vector<std::unique_ptr<Hitt
             std::make_unique<MeshTriangle>(
                     numFaces, faceIndex, vertsIndex, verts, normals, st);
 
-    meshTriangle->materialType = MaterialType::COW;
+    meshTriangle->materialType = MaterialType::METAL;
 
     objects.push_back(std::move(meshTriangle));
 
@@ -235,13 +235,13 @@ HittableList loadSceneFromFile(const std::string& filename) {
 
         } else if(type == "bezier") {
             const auto numOfObjects = objects.size();
-
-            glm::mat4 o2w = glm::translate(glm::mat4(1.0f), glm::vec3(3 ,-5, -7));
+         //                                                           lr   ud
+            glm::mat4 o2w = glm::translate(glm::mat4(1.0f), glm::vec3(1 ,-4, -8));
             //to rotate it, we need to rotate it by 90 degrees around the x-axis
             o2w = glm::rotate(o2w, glm::radians(-90.0f), glm::vec3(1, 0, 0));
-            o2w = glm::rotate(o2w, glm::radians(-70.0f), glm::vec3(0, 0, 1));
+            o2w = glm::rotate(o2w, glm::radians(-50.0f), glm::vec3(0, 0, 1));
             //to scale it, we need to scale it by 0.5
-            o2w = glm::scale(o2w, glm::vec3(0.7, 0.7, 0.7));
+//            o2w = glm::scale(o2w, glm::vec3(0.7, 0.7, 0.7));
 
 
             createPolyTeapot(o2w, objects);
@@ -437,7 +437,7 @@ glm::vec3 castRay(
             case COW:
             {
                 float NdotView = std::max(0.f, glm::dot(N, -dir));
-                const int M = 10;
+                const int M = 2;
                 float checker = (fmod(st.x * M, 1.0f) > 0.5f) ^ (fmod(st.y * M, 1.0f) < 0.5f);
                 float c = 0.3 * (1 - checker) + 0.7 * checker;
 
@@ -523,18 +523,36 @@ void render(
     auto framebuffer = std::vector<glm::vec3>(options.width * options.height);
     auto scale = (float)tan(glm::radians(options.fov * 0.5));
     float imageAspectRatio = (float)options.width / (float)options.height;
+    int samples = 1;
+
+//    std::random_device rd;
+//    std::mt19937 e2(rd());
+//    std::uniform_real_distribution<> dist(-0.0001f, 0.0001f);
 
     int index = 0;
     for (unsigned j = 0; j < options.height; ++j) {
         for (unsigned i = 0; i < options.width; ++i) {
-            // generate primary ray direction
-            float x = (2.0f * ((float)i + 0.5f) / (float)options.width - 1.0f) * imageAspectRatio * scale;
-            float y = (1.0f - 2.0f * ((float)j + 0.5f) / (float)options.height) * scale;
-            // glm::vec3 dir = normalize(glm::vec3(x, y, -1));
-            glm::vec3 dir;
-            multDirMatrix(glm::vec3(x, y, -1), dir,options.cameraToWorld);
-            dir = glm::normalize(dir);
-            framebuffer[index++] = castRay(orig, dir, objects, lights, options, 0);
+            glm::vec3 col(0);
+            for(int s = 0; s < samples; s++) {
+
+
+                // generate primary ray direction
+                float x = (2.0f * ((float)i + 0.5f) / (float)options.width - 1.0f) * imageAspectRatio * scale;
+                float y = (1.0f - 2.0f * ((float)j + 0.5f) / (float)options.height) * scale;
+
+                // offset the ray origin to avoid self intersection
+
+                glm::vec3 dir;
+                multDirMatrix(glm::vec3(x, y, -1), dir,options.cameraToWorld);
+
+//                auto offset = glm::vec3(dist(e2), dist(e2), dist(e2));
+
+                dir = glm::normalize(dir);
+
+                col += castRay(orig, dir, objects, lights, options, 0);
+            }
+            framebuffer[index++] = col / (float)samples;
+
         }
         std::cout << "\rRendering (" << 1 << " spp) " << 100.f * (float)j / (float)(options.height - 1) << "%" << std::flush;
     }
@@ -699,8 +717,8 @@ int main()
 
     // setting up options
     Options options{};
-    options.width = 200;
-    options.height =200;
+    options.width = 300;
+    options.height =300;
     options.fov = 80;
     options.backgroundColor = glm::vec3(0.235294, 0.67451, 0.843137);
     options.maxDepth = 2;

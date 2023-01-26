@@ -285,7 +285,7 @@ void MeshTriangle::calcNormal(hit_record& rec) const{
 
 void MeshTriangle::calcST(hit_record& rec) const{
 
-    if (meshType == MeshType::QUAD) {
+    if (meshType == MeshType::QUAD || true) {
 
         auto triangle = vertIndices->at(rec.triIndex);
 
@@ -297,6 +297,7 @@ void MeshTriangle::calcST(hit_record& rec) const{
     }
     else if( meshType == MeshType::FILE)
     {
+
         glm::vec2 st01 = st->at(rec.triIndex * 3);
         glm::vec2 st11 = st->at(rec.triIndex * 3 + 1);
         glm::vec2 st21 = st->at(rec.triIndex * 3 + 2);

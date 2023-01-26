@@ -31,6 +31,8 @@ foreach(YAML_FILE ${YAML_FILES})
 endforeach()
 
 
+configure_file(cow.geo ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
+
 
 
 
