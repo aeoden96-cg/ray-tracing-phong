@@ -16,7 +16,7 @@ ADD_EXECUTABLE(PROJECT
         source/Light.h
         source/Light.cpp
         source/teapotdata.h
-)
+        )
 
 target_link_libraries(
         PROJECT LINK_PUBLIC -lyaml-cpp
@@ -29,6 +29,15 @@ file(GLOB_RECURSE YAML_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.yaml")
 foreach(YAML_FILE ${YAML_FILES})
     configure_file(${YAML_FILE} ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
 endforeach()
+
+configure_file(source/cow.geo ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
+
+# copy all .obj files to build directory
+file(GLOB OBJ_FILES "${CMAKE_CURRENT_SOURCE_DIR}/source/*.obj")
+foreach(OBJ_FILE ${OBJ_FILES})
+    configure_file(${OBJ_FILE} ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
+endforeach()
+
 
 
 

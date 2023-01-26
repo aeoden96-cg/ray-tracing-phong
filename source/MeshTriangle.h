@@ -27,19 +27,22 @@ public:
         this->vertIndices = std::make_unique<std::vector<glm::ivec3>>(vertIndices_in);
         this->st = std::make_unique<std::vector<glm::vec2>>(st_in);
 
+    }
 
+    MeshTriangle(
+            std::unique_ptr<std::vector<glm::vec3>>& vertices_in,
+            std::unique_ptr<std::vector<glm::ivec3>>&  vertIndices_in,
+            std::unique_ptr<std::vector<glm::vec2>>& st_in,
+            std::unique_ptr<std::vector<glm::vec3>>& normals_in):
+            smoothShading(false),
+            meshType(MeshType::FILE)
+    {
 
-        std::cout << "Loaded: -------------" << std::endl;
-        std::cout << "  " <<  vertices->size() << " vertices" << std::endl;
-        std::cout << "  " <<  vertIndices->size() << " triangle indices" << std::endl;
-        std::cout << "  " << /* N->size()*/ 0 << " normals" << std::endl;
-        std::cout << "  " <<  this->st->size() << " texture coordinates" << std::endl;
+        this->vertices = std::move(vertices_in);
+        this->vertIndices = std::move(vertIndices_in);
+        this->st = std::move(st_in);
+        this->N = std::move(normals_in);
 
-        std:: cout <<  "  "<<"Mesh type: " << int(meshType) << std::endl;
-        std:: cout <<  "  "<<"smoothShading: " << smoothShading << std::endl;
-        std:: cout <<  "  "<<"isSingleVertAttr: " << isSingleVertAttr << std::endl;
-
-        std::cout << "-------------------" << std::endl;
     }
 
 
@@ -59,6 +62,13 @@ public:
             const std::unique_ptr<std::vector<glm::vec3>> &verts,
             std::unique_ptr<std::vector<glm::vec3>> &normals,
             std::unique_ptr<std::vector<glm::vec2>> &st);
+
+    MeshTriangle(
+            const uint32_t numFaces,
+            const std::unique_ptr<std::vector<uint32_t>> &faceIndex,
+            const std::unique_ptr<std::vector<uint32_t>> &vertsIndex,
+            const std::unique_ptr<std::vector<glm::vec3>> &verts,
+            std::unique_ptr<std::vector<glm::vec3>> &normals);
 
     bool intersect(
         const glm::vec3 &orig,

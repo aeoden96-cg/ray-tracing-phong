@@ -1,15 +1,15 @@
 objects:
-- type: sphere
-  center: [0, 1.8, -10]
-  radius: 3
-  color: [0.5, 0.5, 0.5]
-  material: "REFLECTION_AND_REFRACTION"
+#- type: sphere
+#  center: [0, 1.8, -10]
+#  radius: 3
+#  color: [0.5, 0.5, 0.5]
+#  material: "REFLECTION_AND_REFRACTION"
 
-- type: sphere
-  center: [2, -1, -12]
-  radius: 3
-  color: [0.5, 0.5, 0.5]
-  material: "METAL"
+#- type: sphere
+#  center: [2, -1, -12]
+#  radius: 3
+#  color: [0.5, 0.5, 0.5]
+#  material: "METAL"
 
   #floor
 - type: plane
@@ -52,12 +52,12 @@ objects:
   material: "DIFFUSE_AND_GLOSSY"
 
   #mesh cow
-- type: mesh
-  material: "COW"
+#- type: mesh
+#  material: "COW"
 
   #bezier
-- type: bezier
-  material: "POT"
+#- type: bezier
+#  material: "POT"
 
 
 

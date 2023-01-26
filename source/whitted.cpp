@@ -37,8 +37,12 @@
 #include <boost/range/combine.hpp>
 #include <memory>
 
+#define TINYOBJLOADER_IMPLEMENTATION // define this in only *one* .cc
+#include <tiny_obj_loader.h>
+
 #include "yaml-cpp/yaml.h"
-//#include "PatchMesh.h"
+
+
 
 
 
@@ -105,6 +109,145 @@ void createPolyTeapot(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable
 
         objects.push_back(std::move(meshTriangle));
     }
+}
+
+void loadTinyOBJFromFile(std::string filename,std::vector<std::unique_ptr<Hittable>> &objects, glm::mat4 o2w){
+    std::string inputfile = filename;
+    tinyobj::ObjReaderConfig reader_config;
+    reader_config.mtl_search_path = "./"; // Path to material files
+
+    tinyobj::ObjReader reader;
+
+    if (!reader.ParseFromFile(inputfile, reader_config)) {
+        if (!reader.Error().empty()) {
+            std::cerr << "TinyObjReader: " << reader.Error();
+        }
+        exit(1);
+    }
+
+    if (!reader.Warning().empty()) {
+        std::cout << "TinyObjReader: " << reader.Warning();
+    }
+
+    auto& attrib = reader.GetAttrib();
+    auto& shapes = reader.GetShapes();
+    auto& materials = reader.GetMaterials();
+
+    int shapeIndex = 0;
+    auto myShape = shapes[shapeIndex];
+    auto numOfFaces = myShape.mesh.num_face_vertices.size();
+
+
+    std::unique_ptr<std::vector<uint32_t>> faceIndex(new std::vector<uint32_t>(numOfFaces));
+    std::unique_ptr<std::vector<glm::ivec3>> vertIndices(new std::vector<glm::ivec3>(0));
+    std::unique_ptr<std::vector<glm::vec3>> vertices(new std::vector<glm::vec3>(0));
+    std::unique_ptr<std::vector<glm::vec3>> normals(new std::vector<glm::vec3>(0));
+    std::unique_ptr<std::vector<glm::vec2>> st(new std::vector<glm::vec2>(0));
+
+
+
+    int vertsArraySize = 0;
+    size_t index_offset = 0;
+
+    // Loop over shapes
+    //for (size_t s = 0; s < shapes.size(); s++) {
+    for (size_t faceInd = 0; faceInd < myShape.mesh.num_face_vertices.size(); faceInd++) {
+        size_t numOfFacePoints = size_t(myShape.mesh.num_face_vertices[faceInd]);
+
+        //std::cout << "numOfFacePoints: " << numOfFacePoints << std::endl;
+        faceIndex->at(faceInd) = numOfFacePoints;
+
+        glm::ivec3 oneVertIndices;
+
+        // Loop over vertices in the face.
+        for (size_t vertInd = 0; vertInd < numOfFacePoints; vertInd++) {
+            tinyobj::index_t idx = myShape.mesh.indices[index_offset + vertInd];
+
+            oneVertIndices[vertInd] = idx.vertex_index;
+
+            // access to vertex index
+            //std::cout << "vertex_index: " << idx.vertex_index << std::endl;
+            //std::cout << "normal_index: " << idx.normal_index << std::endl;
+            //std::cout << "texcoord_index: " << idx.texcoord_index << std::endl;
+
+
+
+            // access to vertex
+            tinyobj::real_t vx = attrib.vertices[3*size_t(idx.vertex_index)+0];
+            tinyobj::real_t vy = attrib.vertices[3*size_t(idx.vertex_index)+1];
+            tinyobj::real_t vz = attrib.vertices[3*size_t(idx.vertex_index)+2];
+
+            glm::vec3 vert = glm::vec3(vx, vy, vz);
+
+            // transform the vertex
+            vert = glm::vec3(o2w * glm::vec4(vert, 1.0f));
+
+            std::cout << "vx: " << vx << " vy: " << vy << " vz: " << vz << std::endl;
+
+            vertices->push_back(vert);
+
+
+            // Check if `normal_index` is zero or positive. negative = no normal data
+            if (idx.normal_index >= 0) {
+                tinyobj::real_t nx = attrib.normals[3*size_t(idx.normal_index)+0];
+                tinyobj::real_t ny = attrib.normals[3*size_t(idx.normal_index)+1];
+                tinyobj::real_t nz = attrib.normals[3*size_t(idx.normal_index)+2];
+
+                //std::cout << "nx: " << nx << " ny: " << ny << " nz: " << nz << std::endl;
+                normals->push_back(glm::vec3(nx, ny, nz));
+            }
+
+            // Check if `texcoord_index` is zero or positive. negative = no texcoord data
+            if (idx.texcoord_index >= 0) {
+                tinyobj::real_t tx = attrib.texcoords[2*size_t(idx.texcoord_index)+0];
+                tinyobj::real_t ty = attrib.texcoords[2*size_t(idx.texcoord_index)+1];
+
+                //std::cout << "tx: " << tx << " ty: " << ty << std::endl;
+
+                st->push_back(glm::vec2(tx, ty));
+            }
+
+            else {
+                std::cout << "no texcoord data" << std::endl;
+                exit(-1);
+            }
+
+            // Optional: vertex colors
+            // tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
+            // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
+            // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
+        }
+        vertIndices->push_back(oneVertIndices);
+
+        std::cout << oneVertIndices.x << " " << oneVertIndices.y << " " << oneVertIndices.z << std::endl;
+        index_offset += numOfFacePoints;
+
+        // per-face material
+        myShape.mesh.material_ids[faceInd];
+
+    }
+
+    // exit app
+
+    //std::unique_ptr<MeshTriangle> meshTriangle =
+    //        std::make_unique<MeshTriangle>(
+     //               numFaces, faceIndex, vertsIndex, verts, normals, st);
+
+    //meshTriangle->materialType = MaterialType::COW;
+
+    //objects.push_back(std::move(meshTriangle));
+
+    std::cout << "num of points " << vertices->size() << std::endl;
+    std::cout << "num of normals " << normals->size() << std::endl;
+    std::cout << "num of st " << st->size() << std::endl;
+
+    std::unique_ptr<MeshTriangle> meshTriangle =
+            std::make_unique<MeshTriangle>(
+                        vertices, vertIndices, st, normals);
+
+    meshTriangle->materialType = MaterialType::COW;
+
+    objects.push_back(std::move(meshTriangle));
 }
 
 void loadPolyMeshFromFile(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable>> &objects)
@@ -191,7 +334,6 @@ HittableList loadSceneFromFile(const std::string& filename) {
 
 
 
-
     for (auto object : config["objects"]) {
         auto type = object["type"].as<std::string>();
         auto material_name = object["material"].as<std::string>();
@@ -263,6 +405,16 @@ HittableList loadSceneFromFile(const std::string& filename) {
             throw std::runtime_error("Unknown object type");
         }
     }
+
+    glm::mat4 o2w = glm::translate(glm::mat4(1.0f), glm::vec3(0 ,-2, -5));
+    //to rotate it, we need to rotate it by 90 degrees around the x-axis
+    o2w = glm::rotate(o2w, glm::radians(0.0f), glm::vec3(1, 0, 0));
+    o2w = glm::rotate(o2w, glm::radians(110.0f), glm::vec3(0, 1, 0));
+    //to scale it, we need to scale it by 0.5
+    o2w = glm::scale(o2w, glm::vec3(1, 1, 1));
+
+    loadTinyOBJFromFile("cube_new.obj", objects, o2w);
+
 
     return objects;
 }
@@ -687,11 +839,12 @@ int main()
     objects = loadSceneFromFile(fileName);
 
     unsigned numOfObjects = objects.size();
-    std::cout << "Loaded " << numOfObjects << " objects" << std::endl;
+    //std::cout << "Loaded " << numOfObjects << " objects" << std::endl;
 
 
 
 //    createCurveGeometry(objects);
+
 
 
     lights.push_back(std::make_unique<Light>(glm::vec3(0,4,-11), glm::vec3(1,1,1)));
@@ -699,8 +852,8 @@ int main()
 
     // setting up options
     Options options{};
-    options.width = 200;
-    options.height =200;
+    options.width = 300;
+    options.height =300;
     options.fov = 80;
     options.backgroundColor = glm::vec3(0.235294, 0.67451, 0.843137);
     options.maxDepth = 2;
