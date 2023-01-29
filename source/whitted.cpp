@@ -137,13 +137,27 @@ void loadTinyOBJFromFile(std::string filename,std::vector<std::unique_ptr<Hittab
     auto myShape = shapes[shapeIndex];
     auto numOfFaces = myShape.mesh.num_face_vertices.size();
 
+    int numberOfPoints = 0;
+    for (size_t f = 0; f < numOfFaces; f++) {
+        int fv = myShape.mesh.num_face_vertices[f];
+        for (size_t v = 0; v < fv; v++) {
+            tinyobj::index_t idx = myShape.mesh.indices[3 * f + v];
+            if (idx.vertex_index > numberOfPoints) {
+                numberOfPoints = idx.vertex_index;
+            }
+        }
+    }
+
+    numberOfPoints++;
+
+    std::cout << "numberOfPoints: " << numberOfPoints << std::endl;
+
 
     std::unique_ptr<std::vector<uint32_t>> faceIndex(new std::vector<uint32_t>(numOfFaces));
-    std::unique_ptr<std::vector<glm::ivec3>> vertIndices(new std::vector<glm::ivec3>(0));
-    std::unique_ptr<std::vector<glm::vec3>> vertices(new std::vector<glm::vec3>(0));
-    std::unique_ptr<std::vector<glm::vec3>> normals(new std::vector<glm::vec3>(0));
-    std::unique_ptr<std::vector<glm::vec2>> st(new std::vector<glm::vec2>(0));
-
+    std::unique_ptr<std::vector<glm::ivec3>> vertIndices(new std::vector<glm::ivec3>(numOfFaces));
+    std::unique_ptr<std::vector<glm::vec3>> vertices(new std::vector<glm::vec3>(numberOfPoints));
+    std::unique_ptr<std::vector<glm::vec3>> normals(new std::vector<glm::vec3>(numberOfPoints));
+    std::unique_ptr<std::vector<glm::vec2>> st(new std::vector<glm::vec2>(numberOfPoints));
 
 
     int vertsArraySize = 0;
@@ -157,6 +171,8 @@ void loadTinyOBJFromFile(std::string filename,std::vector<std::unique_ptr<Hittab
         //std::cout << "numOfFacePoints: " << numOfFacePoints << std::endl;
         faceIndex->at(faceInd) = numOfFacePoints;
 
+        std::cout << "Face " << faceInd << " has " << numOfFacePoints << " vertices" << std::endl;
+
         glm::ivec3 oneVertIndices;
 
         // Loop over vertices in the face.
@@ -165,10 +181,12 @@ void loadTinyOBJFromFile(std::string filename,std::vector<std::unique_ptr<Hittab
 
             oneVertIndices[vertInd] = idx.vertex_index;
 
+            std::cout << "  Point " << vertInd << " has vertex index " << idx.vertex_index << std::endl;
+
             // access to vertex index
-            //std::cout << "vertex_index: " << idx.vertex_index << std::endl;
-            //std::cout << "normal_index: " << idx.normal_index << std::endl;
-            //std::cout << "texcoord_index: " << idx.texcoord_index << std::endl;
+            std::cout << "      vertex_index: " << idx.vertex_index << std::endl;
+            std::cout << "      normal_index: " << idx.normal_index << std::endl;
+            std::cout << "      texcoord_index: " << idx.texcoord_index << std::endl;
 
 
 
@@ -182,9 +200,9 @@ void loadTinyOBJFromFile(std::string filename,std::vector<std::unique_ptr<Hittab
             // transform the vertex
             vert = glm::vec3(o2w * glm::vec4(vert, 1.0f));
 
-            std::cout << "vx: " << vx << " vy: " << vy << " vz: " << vz << std::endl;
+            std::cout << "      vx: " << vx << " vy: " << vy << " vz: " << vz << std::endl;
 
-            vertices->push_back(vert);
+            vertices->at(idx.vertex_index) = vert;
 
 
             // Check if `normal_index` is zero or positive. negative = no normal data
@@ -193,8 +211,8 @@ void loadTinyOBJFromFile(std::string filename,std::vector<std::unique_ptr<Hittab
                 tinyobj::real_t ny = attrib.normals[3*size_t(idx.normal_index)+1];
                 tinyobj::real_t nz = attrib.normals[3*size_t(idx.normal_index)+2];
 
-                //std::cout << "nx: " << nx << " ny: " << ny << " nz: " << nz << std::endl;
-                normals->push_back(glm::vec3(nx, ny, nz));
+                std::cout << "      nx: " << nx << " ny: " << ny << " nz: " << nz << std::endl;
+                normals->at(idx.vertex_index) = glm::vec3(nx, ny, nz);
             }
 
             // Check if `texcoord_index` is zero or positive. negative = no texcoord data
@@ -202,9 +220,9 @@ void loadTinyOBJFromFile(std::string filename,std::vector<std::unique_ptr<Hittab
                 tinyobj::real_t tx = attrib.texcoords[2*size_t(idx.texcoord_index)+0];
                 tinyobj::real_t ty = attrib.texcoords[2*size_t(idx.texcoord_index)+1];
 
-                //std::cout << "tx: " << tx << " ty: " << ty << std::endl;
+                std::cout << "      tx: " << tx << " ty: " << ty << std::endl;
 
-                st->push_back(glm::vec2(tx, ty));
+                st->at(idx.vertex_index) = glm::vec2(tx, ty);
             }
 
             else {
@@ -217,13 +235,13 @@ void loadTinyOBJFromFile(std::string filename,std::vector<std::unique_ptr<Hittab
             // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
             // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
         }
-        vertIndices->push_back(oneVertIndices);
+        vertIndices->at(faceInd) = oneVertIndices;
 
-        std::cout << oneVertIndices.x << " " << oneVertIndices.y << " " << oneVertIndices.z << std::endl;
+//        std::cout << oneVertIndices.x << " " << oneVertIndices.y << " " << oneVertIndices.z << std::endl;
         index_offset += numOfFacePoints;
 
         // per-face material
-        myShape.mesh.material_ids[faceInd];
+        // myShape.mesh.material_ids[faceInd];
 
     }
 
@@ -406,14 +424,14 @@ HittableList loadSceneFromFile(const std::string& filename) {
         }
     }
 
-    glm::mat4 o2w = glm::translate(glm::mat4(1.0f), glm::vec3(0 ,-2, -5));
+    glm::mat4 o2w = glm::translate(glm::mat4(1.0f), glm::vec3(0 ,-0, -5));
     //to rotate it, we need to rotate it by 90 degrees around the x-axis
     o2w = glm::rotate(o2w, glm::radians(0.0f), glm::vec3(1, 0, 0));
-    o2w = glm::rotate(o2w, glm::radians(110.0f), glm::vec3(0, 1, 0));
+    o2w = glm::rotate(o2w, glm::radians(140.0f), glm::vec3(0, 1, 0));
     //to scale it, we need to scale it by 0.5
-    o2w = glm::scale(o2w, glm::vec3(1, 1, 1));
+    o2w = glm::scale(o2w, glm::vec3(0.1, 0.1, 0.1));
 
-    loadTinyOBJFromFile("cube_new.obj", objects, o2w);
+    loadTinyOBJFromFile("dino.obj", objects, o2w);
 
 
     return objects;
