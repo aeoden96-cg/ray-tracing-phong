@@ -111,14 +111,13 @@ void createPolyTeapot(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable
     }
 }
 
-void loadTinyOBJFromFile(std::string filename,std::vector<std::unique_ptr<Hittable>> &objects, glm::mat4 o2w){
-    std::string inputfile = filename;
+std::unique_ptr<MeshTriangle> loadTinyOBJFromFile(std::string filename, glm::mat4 o2w){
     tinyobj::ObjReaderConfig reader_config;
     reader_config.mtl_search_path = "./"; // Path to material files
 
     tinyobj::ObjReader reader;
 
-    if (!reader.ParseFromFile(inputfile, reader_config)) {
+    if (!reader.ParseFromFile(filename, reader_config)) {
         if (!reader.Error().empty()) {
             std::cerr << "TinyObjReader: " << reader.Error();
         }
@@ -171,7 +170,7 @@ void loadTinyOBJFromFile(std::string filename,std::vector<std::unique_ptr<Hittab
         //std::cout << "numOfFacePoints: " << numOfFacePoints << std::endl;
         faceIndex->at(faceInd) = numOfFacePoints;
 
-        std::cout << "Face " << faceInd << " has " << numOfFacePoints << " vertices" << std::endl;
+//        std::cout << "Face " << faceInd << " has " << numOfFacePoints << " vertices" << std::endl;
 
         glm::ivec3 oneVertIndices;
 
@@ -181,12 +180,12 @@ void loadTinyOBJFromFile(std::string filename,std::vector<std::unique_ptr<Hittab
 
             oneVertIndices[vertInd] = idx.vertex_index;
 
-            std::cout << "  Point " << vertInd << " has vertex index " << idx.vertex_index << std::endl;
+//            std::cout << "  Point " << vertInd << " has vertex index " << idx.vertex_index << std::endl;
 
             // access to vertex index
-            std::cout << "      vertex_index: " << idx.vertex_index << std::endl;
-            std::cout << "      normal_index: " << idx.normal_index << std::endl;
-            std::cout << "      texcoord_index: " << idx.texcoord_index << std::endl;
+//            std::cout << "      vertex_index: " << idx.vertex_index << std::endl;
+//            std::cout << "      normal_index: " << idx.normal_index << std::endl;
+//            std::cout << "      texcoord_index: " << idx.texcoord_index << std::endl;
 
 
 
@@ -200,7 +199,7 @@ void loadTinyOBJFromFile(std::string filename,std::vector<std::unique_ptr<Hittab
             // transform the vertex
             vert = glm::vec3(o2w * glm::vec4(vert, 1.0f));
 
-            std::cout << "      vx: " << vx << " vy: " << vy << " vz: " << vz << std::endl;
+//            std::cout << "      vx: " << vx << " vy: " << vy << " vz: " << vz << std::endl;
 
             vertices->at(idx.vertex_index) = vert;
 
@@ -211,7 +210,7 @@ void loadTinyOBJFromFile(std::string filename,std::vector<std::unique_ptr<Hittab
                 tinyobj::real_t ny = attrib.normals[3*size_t(idx.normal_index)+1];
                 tinyobj::real_t nz = attrib.normals[3*size_t(idx.normal_index)+2];
 
-                std::cout << "      nx: " << nx << " ny: " << ny << " nz: " << nz << std::endl;
+//                std::cout << "      nx: " << nx << " ny: " << ny << " nz: " << nz << std::endl;
                 normals->at(idx.vertex_index) = glm::vec3(nx, ny, nz);
             }
 
@@ -220,7 +219,7 @@ void loadTinyOBJFromFile(std::string filename,std::vector<std::unique_ptr<Hittab
                 tinyobj::real_t tx = attrib.texcoords[2*size_t(idx.texcoord_index)+0];
                 tinyobj::real_t ty = attrib.texcoords[2*size_t(idx.texcoord_index)+1];
 
-                std::cout << "      tx: " << tx << " ty: " << ty << std::endl;
+//                std::cout << "      tx: " << tx << " ty: " << ty << std::endl;
 
                 st->at(idx.vertex_index) = glm::vec2(tx, ty);
             }
@@ -255,17 +254,17 @@ void loadTinyOBJFromFile(std::string filename,std::vector<std::unique_ptr<Hittab
 
     //objects.push_back(std::move(meshTriangle));
 
-    std::cout << "num of points " << vertices->size() << std::endl;
-    std::cout << "num of normals " << normals->size() << std::endl;
-    std::cout << "num of st " << st->size() << std::endl;
+//    std::cout << "num of points " << vertices->size() << std::endl;
+//    std::cout << "num of normals " << normals->size() << std::endl;
+//    std::cout << "num of st " << st->size() << std::endl;
 
-    std::unique_ptr<MeshTriangle> meshTriangle =
-            std::make_unique<MeshTriangle>(
-                        vertices, vertIndices, st, normals);
+//    std::unique_ptr<MeshTriangle> meshTriangle =
+//            std::make_unique<MeshTriangle>(
+//                        vertices, vertIndices, st, normals);
+//
 
-    meshTriangle->materialType = MaterialType::COW;
-
-    objects.push_back(std::move(meshTriangle));
+    return std::make_unique<MeshTriangle>(
+            vertices, vertIndices, st, normals);
 }
 
 void loadPolyMeshFromFile(const glm::mat4& o2w, std::vector<std::unique_ptr<Hittable>> &objects)
@@ -337,20 +336,27 @@ void loadPolyMeshFromFile(const glm::mat4& o2w, std::vector<std::unique_ptr<Hitt
 }
 
 
+glm::vec3 toGlmVec3(const std::vector<float>& v) {
+    return {v[0], v[1], v[2]};
+}
+
+glm::ivec3 toGlmIvec3(const std::vector<int>& v) {
+    return {v[0], v[1], v[2]};
+}
+
+
 
 HittableList loadSceneFromFile(const std::string& filename) {
     YAML::Node config = YAML::LoadFile(filename + ".yaml");
 
     HittableList objects;
-
     std::map<std::string, MaterialType> materials;
 
-    materials["DIFFUSE_AND_GLOSSY"] = DIFFUSE_AND_GLOSSY;
-    materials["REFLECTION_AND_REFRACTION"] = REFLECTION_AND_REFRACTION;
-    materials["REFLECTION"] = REFLECTION;
-    materials["METAL"] = METAL;
-
-
+    materials["DIFFUSE_AND_GLOSSY"] = MaterialType::DIFFUSE_AND_GLOSSY;
+    materials["REFLECTION_AND_REFRACTION"] = MaterialType::REFLECTION_AND_REFRACTION;
+    materials["REFLECTION"] = MaterialType::REFLECTION;
+    materials["METAL"] = MaterialType::METAL;
+    materials["COW"] = MaterialType::COW;
 
     for (auto object : config["objects"]) {
         auto type = object["type"].as<std::string>();
@@ -419,20 +425,26 @@ HittableList loadSceneFromFile(const std::string& filename) {
 
             std::cout << "Created poly mesh, which has " << objects.size() - numOfObjects << " objects" << std::endl;
 
+        } else if (type == "obj"){
+            auto position = toGlmVec3(object["position"].as<std::vector<float>>());
+            auto rotation = toGlmVec3(object["rotation"].as<std::vector<float>>());
+            auto scale = toGlmVec3(object["scale"].as<std::vector<float>>());
+
+            glm::mat4 o2w = glm::translate(glm::mat4(1.0f), position);
+            o2w = glm::rotate(o2w, glm::radians(rotation.x), glm::vec3(1, 0, 0));
+            o2w = glm::rotate(o2w, glm::radians(rotation.y), glm::vec3(0, 1, 0));
+            o2w = glm::scale(o2w, scale);
+
+            auto meshFileName = object["file"].as<std::string>();
+            auto mesh_ptr = loadTinyOBJFromFile(meshFileName, o2w);
+
+            mesh_ptr->materialType = material;
+            objects.push_back(std::move(mesh_ptr));
+
         } else {
             throw std::runtime_error("Unknown object type");
         }
     }
-
-    glm::mat4 o2w = glm::translate(glm::mat4(1.0f), glm::vec3(0 ,-0, -5));
-    //to rotate it, we need to rotate it by 90 degrees around the x-axis
-    o2w = glm::rotate(o2w, glm::radians(0.0f), glm::vec3(1, 0, 0));
-    o2w = glm::rotate(o2w, glm::radians(140.0f), glm::vec3(0, 1, 0));
-    //to scale it, we need to scale it by 0.5
-    o2w = glm::scale(o2w, glm::vec3(0.1, 0.1, 0.1));
-
-    loadTinyOBJFromFile("dino.obj", objects, o2w);
-
 
     return objects;
 }

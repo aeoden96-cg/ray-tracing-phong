@@ -322,23 +322,6 @@ bool MeshTriangle::intersect(
 
 
 void MeshTriangle::calcNormal(hit_record& rec) const{
-    //first we need to get the triangle from the index
-
-//
-//    //--------------------normal--------------------
-//    //vai is vertex attribute index, which is the index of the vertex in the vertices array
-//    //triIndex is the index of the triangle in the vertIndices array
-//
-//    //isSingleVertAttr is a boolean that tells us if we have 1 vertex attribute per vertex per face
-//    //or 1 vertex attribute per vertex
-//
-//    glm::vec3 v01 = vertices->at(vertIndices->at(rec.triIndex).x);
-//    glm::vec3 v11 = vertices->at(vertIndices->at(rec.triIndex).y);
-//    glm::vec3 v21 = vertices->at(vertIndices->at(rec.triIndex).z);
-//
-//    rec.normal = glm::normalize(glm::cross(v11 - v01, v21 - v01));
-//
-//    return;
 
     glm::ivec3 triangle;
 
@@ -386,7 +369,10 @@ void MeshTriangle::calcST(hit_record& rec) const{
         const glm::vec2 &st01 = st->at(triangle.x);
         const glm::vec2 &st11 = st->at(triangle.y);
         const glm::vec2 &st21 = st->at(triangle.z);
+
+
         rec.st = (1 - rec.uv.x - rec.uv.y) * st01 + rec.uv.x * st11 + rec.uv.y * st21;
+//        rec.st = {triangle.x,triangle.y};
     }
 
 

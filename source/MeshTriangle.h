@@ -34,7 +34,7 @@ public:
             std::unique_ptr<std::vector<glm::ivec3>>&  vertIndices_in,
             std::unique_ptr<std::vector<glm::vec2>>& st_in,
             std::unique_ptr<std::vector<glm::vec3>>& normals_in):
-            smoothShading(false),
+            smoothShading(true),
             meshType(MeshType::FILE)
     {
 

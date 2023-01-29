@@ -59,5 +59,14 @@ objects:
 #- type: bezier
 #  material: "POT"
 
+  #dino mesh
+- type: obj
+  file: "dino.obj"
+  material: "COW"
+  position: [0,-5, -8]
+  rotation: [0,10,0]
+  scale: [0.3,0.3,0.3]
+
+
 
 
