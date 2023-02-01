@@ -196,7 +196,6 @@ MeshTriangle::MeshTriangle(
         const glm::mat4 &o2w,
         bool singleVertAttr) :
         Hittable(o2w),
-        isSingleVertAttr(singleVertAttr),
         meshType(MeshType::POT)
 {
     unsigned numTris = 0;
@@ -235,7 +234,8 @@ MeshTriangle::MeshTriangle(
     //isSingleVertAttr is true by default
     //if isSingleVertAttr is true, then we have 1 vertex attribute per vertex per face
     //if isSingleVertAttr is false, then we have 1 vertex attribute per vertex
-    if (isSingleVertAttr) {
+//    if (isSingleVertAttr) {
+if (true) {
         this->N = std::make_unique<std::vector<glm::vec3>>(maxVertIndex);
         this->st = std::make_unique<std::vector<glm::vec2>>(maxVertIndex);
 
@@ -302,7 +302,6 @@ bool MeshTriangle::intersect(
 ) const
 {
     bool intersect = false;
-    uint32_t j = 0;
     for (uint32_t i = 0; i < vertIndices->size(); ++i) {
         glm::vec3 v0 = vertices->at(vertIndices->at(i).x);
         glm::vec3 v1 = vertices->at(vertIndices->at(i).y);
@@ -315,7 +314,7 @@ bool MeshTriangle::intersect(
             index = i;
             intersect = true;
         }
-        j += 3;
+
     }
     return intersect;
 }
@@ -323,19 +322,13 @@ bool MeshTriangle::intersect(
 
 void MeshTriangle::calcNormal(hit_record& rec) const{
 
-    glm::ivec3 triangle;
 
-    if (isSingleVertAttr) {
-        triangle = vertIndices->at(rec.triIndex);
-    }
-    else {
-        triangle = glm::vec3(rec.triIndex,rec.triIndex,rec.triIndex);
-    }
+    glm::ivec3 triangle = vertIndices->at(rec.triIndex);
 
     if (smoothShading) {
-        const glm::vec3 &n0 = N->at(triangle.x);
-        const glm::vec3 &n1 = N->at(triangle.y);
-        const glm::vec3 &n2 = N->at(triangle.z);
+        const glm::vec3 &n0 = N->at(rec.triIndex);
+        const glm::vec3 &n1 = N->at(rec.triIndex);
+        const glm::vec3 &n2 = N->at(rec.triIndex);
         rec.normal = (1 - rec.uv.x - rec.uv.y) * n0 + rec.uv.x * n1 + rec.uv.y * n2;
     }
     else {
@@ -344,6 +337,18 @@ void MeshTriangle::calcNormal(hit_record& rec) const{
         const glm::vec3 & v1 = vertices->at(triangle.y);
         const glm::vec3 & v2 = vertices->at(triangle.z);
         rec.normal = glm::cross((v1 - v0),(v2 - v0));
+    }
+
+    if(N != nullptr)
+    {
+        auto n = glm::normalize(rec.normal);
+
+//        std::cout << "Polygon: " << rec.triIndex << std::endl;
+//        std::cout << "Normal: " << n.x << " " << n.y << " " << n.z << std::endl;
+        rec.normal = N->at(rec.triIndex);
+//        std::cout << "Normal: " << rec.normal.x << " " << rec.normal.y << " " << rec.normal.z << std::endl;
+//        std::cout << "Triangle: " << triangle.x << " " << triangle.y << " " << triangle.z << std::endl;
+
     }
 
     rec.normal = glm::normalize(rec.normal);
@@ -365,10 +370,11 @@ void MeshTriangle::calcST(hit_record& rec) const{
     else if( meshType == MeshType::FILE)
     {
         auto triangle = vertIndices->at(rec.triIndex);
+//        std::cout << rec.triIndex << std::endl;
 
-        const glm::vec2 &st01 = st->at(triangle.x);
-        const glm::vec2 &st11 = st->at(triangle.y);
-        const glm::vec2 &st21 = st->at(triangle.z);
+        const glm::vec2 &st01 = st->at(3 * rec.triIndex);
+        const glm::vec2 &st11 = st->at(3 * rec.triIndex + 1);
+        const glm::vec2 &st21 = st->at(3 * rec.triIndex + 2);
 
 
         rec.st = (1 - rec.uv.x - rec.uv.y) * st01 + rec.uv.x * st11 + rec.uv.y * st21;
@@ -421,10 +427,10 @@ glm::vec3 MeshTriangle::checkerPattern(const glm::vec2 &st)
     int s = (int)floor(st.x * scale);
     int t = (int)floor(st.y * scale);
     if ((s + t) % 2 == 0) {
-        return glm::vec3(0.815, 0.235, 0.031);
+        return glm::vec3(0.70, 0.235, 0.131);
     }
     else {
-        return glm::vec3(0.937, 0.937, 0.231);
+        return glm::vec3(0.537, 0.737, 0.231);
     }
 
 //    float pattern = (fmodf(st.x * scale, 1) > 0.5f) ^ (fmodf(st.y * scale, 1) > 0.5);

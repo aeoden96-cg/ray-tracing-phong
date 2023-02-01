@@ -62,6 +62,13 @@ bool rayTriangleIntersect(
     const glm::vec3 &orig, const glm::vec3 &dir,
     float &tnear, float &u, float &v);
 
+bool rayTriangleIntersect2(
+        const glm::vec3 &v0, const glm::vec3 &v1, const glm::vec3 &v2,
+        const glm::vec3 &orig, const glm::vec3 &dir,
+        float &tnear, float &u, float &v);
+
+
+
 
 // Compute reflection direction
 glm::vec3 reflect(const glm::vec3 &I, const glm::vec3 &N);

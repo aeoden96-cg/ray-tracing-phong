@@ -24,33 +24,75 @@ bool solveQuadratic(const float &a, const float &b, const float &c, float &x0, f
     return true;
 }
 
+bool rayTriangleIntersect2(
+        const glm::vec3 &v0, const glm::vec3 &v1, const glm::vec3 &v2,
+        const glm::vec3 &orig, const glm::vec3 &dir,
+        float &tnear, float &u, float &v)
+{
+    glm::vec3 v0v1 = v1 - v0;
+    glm::vec3 v0v2 = v2 - v0;
+    glm::vec3 pvec = glm::cross(dir, v0v2);
+    float det = glm::dot(v0v1, pvec);
+    double kEpsilon = 0.00001;
+    #ifdef CULLING
+            // if the determinant is negative, the triangle is 'back facing.'
+        // if the determinant is close to 0, the ray misses the triangle
+        if (det < kEpsilon) return false;
+    #else
+            // ray and triangle are parallel if det is close to 0
+            if (fabs(det) < kEpsilon) return false;
+    #endif
+
+    float invDet = 1 / det;
+
+    glm::vec3 tvec = orig - v0;
+    glm::vec3 qvec = glm::cross(tvec, v0v1);
+
+    u = glm::dot(tvec, pvec) * invDet;
+    v = glm::dot(dir, qvec) * invDet;
+
+    if (u < 0 || u > 1) return false;
+    if (v < 0 || u + v > 1) return false;
+
+    tnear = glm::dot(v0v2, qvec) * invDet;
+
+    return true;
+}
+
 bool rayTriangleIntersect(
     const glm::vec3 &v0, const glm::vec3 &v1, const glm::vec3 &v2,
     const glm::vec3 &orig, const glm::vec3 &dir,
     float &tnear, float &u, float &v)
 {
+//    #define CULLING
     glm::vec3 edge1 = v1 - v0;
     glm::vec3 edge2 = v2 - v0;
+
     glm::vec3 pvec = glm::cross(dir, edge2);
     float det = glm::dot(edge1, pvec);
-    if (det == 0 || det < 0) return false;
+
+    if (std::fabs(det) < 0.0001) return false;
 
     glm::vec3 tvec = orig - v0;
-    u = glm::dot(tvec, pvec);
-    if (u < 0 || u > det) return false;
-
     glm::vec3 qvec = glm::cross(tvec, edge1);
+
+    u = glm::dot(tvec, pvec);
     v = glm::dot(dir, qvec);
+
+    if (u < 0 || u > det) return false;
     if (v < 0 || u + v > det) return false;
 
     float invDet = 1 / det;
-    
+
     tnear = glm::dot(edge2, qvec) * invDet;
     u *= invDet;
     v *= invDet;
 
     return true;
 }
+
+
+
 
 // Compute reflection direction
 glm::vec3 reflect(const glm::vec3 &I, const glm::vec3 &N)

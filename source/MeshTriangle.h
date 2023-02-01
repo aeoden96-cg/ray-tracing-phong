@@ -34,7 +34,7 @@ public:
             std::unique_ptr<std::vector<glm::ivec3>>&  vertIndices_in,
             std::unique_ptr<std::vector<glm::vec2>>& st_in,
             std::unique_ptr<std::vector<glm::vec3>>& normals_in):
-            smoothShading(true),
+            smoothShading(false),
             meshType(MeshType::FILE)
     {
 
@@ -92,7 +92,6 @@ public:
 
     MeshType meshType;
     bool smoothShading = true;       // smooth shading by default
-    bool isSingleVertAttr = true;   // single vertex attribute by default
 
 
 private:

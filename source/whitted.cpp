@@ -137,6 +137,8 @@ std::unique_ptr<MeshTriangle> loadTinyOBJFromFile(std::string filename, glm::mat
     auto numOfFaces = myShape.mesh.num_face_vertices.size();
 
     int numberOfPoints = 0;
+    int numberOfNormals = 0;
+    int numberOfTexCoords = 0;
     for (size_t f = 0; f < numOfFaces; f++) {
         int fv = myShape.mesh.num_face_vertices[f];
         for (size_t v = 0; v < fv; v++) {
@@ -144,19 +146,31 @@ std::unique_ptr<MeshTriangle> loadTinyOBJFromFile(std::string filename, glm::mat
             if (idx.vertex_index > numberOfPoints) {
                 numberOfPoints = idx.vertex_index;
             }
+            if (idx.normal_index > numberOfNormals) {
+                numberOfNormals = idx.normal_index;
+            }
+
         }
+//        std::cout << "fv:" << fv << std::endl;
+        numberOfTexCoords += fv;
     }
 
     numberOfPoints++;
+    numberOfNormals = numOfFaces;
 
-    std::cout << "numberOfPoints: " << numberOfPoints << std::endl;
+    std::cout << "num of points:" << numberOfPoints << std::endl;
+    std::cout << "num of normals:" << numberOfNormals << std::endl;
+    std::cout << "num of ST:" << numberOfTexCoords << std::endl << std::endl;
 
+//    std::unique_ptr<std::vector<glm::ivec3>> vertIndices(new std::vector<glm::ivec3>(numOfFaces));
+//    std::unique_ptr<std::vector<glm::vec3>> vertices(new std::vector<glm::vec3>(numberOfPoints));
+//    std::unique_ptr<std::vector<glm::vec3>> normals(new std::vector<glm::vec3>(numOfFaces));
+//    std::unique_ptr<std::vector<glm::vec2>> st(new std::vector<glm::vec2>(numberOfTexCoords));
 
-    std::unique_ptr<std::vector<uint32_t>> faceIndex(new std::vector<uint32_t>(numOfFaces));
-    std::unique_ptr<std::vector<glm::ivec3>> vertIndices(new std::vector<glm::ivec3>(numOfFaces));
-    std::unique_ptr<std::vector<glm::vec3>> vertices(new std::vector<glm::vec3>(numberOfPoints));
-    std::unique_ptr<std::vector<glm::vec3>> normals(new std::vector<glm::vec3>(numberOfPoints));
-    std::unique_ptr<std::vector<glm::vec2>> st(new std::vector<glm::vec2>(numberOfPoints));
+    std::unique_ptr<std::vector<glm::ivec3>> vertIndices = std::make_unique<std::vector<glm::ivec3>>(numOfFaces);
+    std::unique_ptr<std::vector<glm::vec3>> vertices = std::make_unique<std::vector<glm::vec3>>(numberOfPoints);
+    std::unique_ptr<std::vector<glm::vec3>> normals = std::make_unique<std::vector<glm::vec3>>(numOfFaces);
+    std::unique_ptr<std::vector<glm::vec2>> st = std::make_unique<std::vector<glm::vec2>>(numberOfTexCoords);
 
 
     int vertsArraySize = 0;
@@ -168,8 +182,6 @@ std::unique_ptr<MeshTriangle> loadTinyOBJFromFile(std::string filename, glm::mat
         size_t numOfFacePoints = size_t(myShape.mesh.num_face_vertices[faceInd]);
 
         //std::cout << "numOfFacePoints: " << numOfFacePoints << std::endl;
-        faceIndex->at(faceInd) = numOfFacePoints;
-
 //        std::cout << "Face " << faceInd << " has " << numOfFacePoints << " vertices" << std::endl;
 
         glm::ivec3 oneVertIndices;
@@ -199,7 +211,6 @@ std::unique_ptr<MeshTriangle> loadTinyOBJFromFile(std::string filename, glm::mat
             // transform the vertex
             vert = glm::vec3(o2w * glm::vec4(vert, 1.0f));
 
-//            std::cout << "      vx: " << vx << " vy: " << vy << " vz: " << vz << std::endl;
 
             vertices->at(idx.vertex_index) = vert;
 
@@ -210,8 +221,10 @@ std::unique_ptr<MeshTriangle> loadTinyOBJFromFile(std::string filename, glm::mat
                 tinyobj::real_t ny = attrib.normals[3*size_t(idx.normal_index)+1];
                 tinyobj::real_t nz = attrib.normals[3*size_t(idx.normal_index)+2];
 
-//                std::cout << "      nx: " << nx << " ny: " << ny << " nz: " << nz << std::endl;
-                normals->at(idx.vertex_index) = glm::vec3(nx, ny, nz);
+                // transform the normal
+                glm::vec3 normal = glm::vec3(nx, ny, nz);
+
+                normals->at(faceInd) = glm::vec3(o2w * glm::vec4(normal, 0.0f));
             }
 
             // Check if `texcoord_index` is zero or positive. negative = no texcoord data
@@ -221,7 +234,7 @@ std::unique_ptr<MeshTriangle> loadTinyOBJFromFile(std::string filename, glm::mat
 
 //                std::cout << "      tx: " << tx << " ty: " << ty << std::endl;
 
-                st->at(idx.vertex_index) = glm::vec2(tx, ty);
+                st->at(faceInd * numOfFacePoints + vertInd) = glm::vec2(tx, ty);
             }
 
             else {
@@ -244,24 +257,10 @@ std::unique_ptr<MeshTriangle> loadTinyOBJFromFile(std::string filename, glm::mat
 
     }
 
-    // exit app
 
-    //std::unique_ptr<MeshTriangle> meshTriangle =
-    //        std::make_unique<MeshTriangle>(
-     //               numFaces, faceIndex, vertsIndex, verts, normals, st);
-
-    //meshTriangle->materialType = MaterialType::COW;
-
-    //objects.push_back(std::move(meshTriangle));
-
-//    std::cout << "num of points " << vertices->size() << std::endl;
-//    std::cout << "num of normals " << normals->size() << std::endl;
-//    std::cout << "num of st " << st->size() << std::endl;
-
-//    std::unique_ptr<MeshTriangle> meshTriangle =
-//            std::make_unique<MeshTriangle>(
-//                        vertices, vertIndices, st, normals);
-//
+    std::cout << "num of points " << vertices->size() << std::endl;
+    std::cout << "num of normals " << normals->size() << std::endl;
+    std::cout << "num of st " << st->size() << std::endl;
 
     return std::make_unique<MeshTriangle>(
             vertices, vertIndices, st, normals);
@@ -340,11 +339,6 @@ glm::vec3 toGlmVec3(const std::vector<float>& v) {
     return {v[0], v[1], v[2]};
 }
 
-glm::ivec3 toGlmIvec3(const std::vector<int>& v) {
-    return {v[0], v[1], v[2]};
-}
-
-
 
 HittableList loadSceneFromFile(const std::string& filename) {
     YAML::Node config = YAML::LoadFile(filename + ".yaml");
@@ -377,6 +371,7 @@ HittableList loadSceneFromFile(const std::string& filename) {
             auto down_left_v = object["down_left"].as<std::vector<float>>();
             auto down_right_v = object["down_right"].as<std::vector<float>>();
 //            material_name = object["material"].as<std::string>();
+            auto color = toGlmVec3(object["color"].as<std::vector<float>>());
             //auto material = materials[material_name];
 
             std::vector<glm::vec3> vertices;
@@ -395,9 +390,14 @@ HittableList loadSceneFromFile(const std::string& filename) {
             uvIndices.emplace_back(glm::vec2(1, 1));
             uvIndices.emplace_back(glm::vec2(0, 1));
 
+            std::unique_ptr<MeshTriangle> meshTriangle =
+                    std::make_unique<MeshTriangle>(
+                            vertices, vertIndices, uvIndices);
 
-            objects.emplace_back(std::make_unique<MeshTriangle>(
-                    vertices, vertIndices, uvIndices));
+            meshTriangle->diffuseColor = color;
+
+
+            objects.emplace_back(std::move(meshTriangle));
 
         } else if(type == "bezier") {
             const auto numOfObjects = objects.size();
@@ -438,7 +438,11 @@ HittableList loadSceneFromFile(const std::string& filename) {
             auto meshFileName = object["file"].as<std::string>();
             auto mesh_ptr = loadTinyOBJFromFile(meshFileName, o2w);
 
+            auto smooth = object["smooth"].as<bool>();
+
             mesh_ptr->materialType = material;
+            mesh_ptr->smoothShading = smooth;
+
             objects.push_back(std::move(mesh_ptr));
 
         } else {
@@ -450,15 +454,7 @@ HittableList loadSceneFromFile(const std::string& filename) {
 }
 
 
-// Returns true if the ray intersects a Hittable, false otherwise.
-// \param orig is the ray origin
-// \param dir is the ray direction
-// \param objects is the list of objects the scene contains
-// \param[out] tNear contains the distance to the closest intersected Hittable.
-// \param[out] index stores the index of the intersect triangle if the interested Hittable is a mesh.
-// \param[out] uv stores the u and v barycentric coordinates of the intersected point
-// \param[out] *hitObject stores the pointer to the intersected Hittable (used to retrieve material information, etc.)
-// \param isShadowRay is it a shadow ray. We can return from the function sooner as soon as we have found a hit.
+
 bool trace(
     const glm::vec3 &orig, const glm::vec3 &dir,
     const std::vector<std::unique_ptr<Hittable>> &objects,
@@ -559,7 +555,7 @@ glm::vec3 castRay(
     const Options &options,
     unsigned depth)
 {
-    if (depth > options.maxDepth) {
+    if (depth > 3) {
         return options.backgroundColor;
     }
 
@@ -569,16 +565,18 @@ glm::vec3 castRay(
     if (trace(orig, dir, objects, rec)) {
 
         rec.object->getSurfaceProperties(dir, rec);
-        
-        glm::vec2 uv = rec.uv;
-        glm::vec3 N = rec.normal;
-        glm::vec2 st = rec.st;
-        glm::vec3 hitPoint = rec.p;
+
 
         switch (rec.object->materialType) {
             case REFLECTION_AND_REFRACTION:
             {
-                float kr = fresnel(dir, N, rec.object->ior);
+
+                if(rec.triIndex == 7){
+                    return glm::vec3(0.0f, 0.0f, 0.0f);
+                }
+
+
+                float kr = fresnel(dir, rec.normal, rec.object->ior);
 
                 glm::vec3 reflectionColor = getReflectionColor(
                     rec, dir, options, depth, objects, lights);
@@ -586,13 +584,12 @@ glm::vec3 castRay(
                 glm::vec3 refractionColor = getRefractionColor(
                     rec, dir, options, depth, objects, lights);
 
-
                 hitColor = reflectionColor * kr + refractionColor * (1 - kr);
                 break;
             }
             case REFLECTION:
             {
-                float kr = fresnel(dir, N, rec.object->ior);
+                float kr = fresnel(dir, rec.normal, rec.object->ior);
 
                 glm::vec3 reflectionColor = getReflectionColor(
                     rec, dir, options, depth, objects, lights);
@@ -602,8 +599,8 @@ glm::vec3 castRay(
             }
             case METAL:
             {
-                float roughness = 0.1f;
-                float kr = fresnel(dir, N, rec.object->ior);
+                float roughness = 0.06f;
+                float kr = fresnel(dir, rec.normal, rec.object->ior);
 
                 glm::vec3 reflectionColor = getReflectionColor(
                     rec,
@@ -613,14 +610,39 @@ glm::vec3 castRay(
                     objects,
                     lights);
 
-                hitColor = reflectionColor * kr;
+                hitColor = reflectionColor * (1- kr);
                 break;
             }
             case COW:
             {
-                float NdotView = std::max(0.f, glm::dot(N, -dir));
+
+
+//                if(rec.triIndex == 9){
+//
+//                    std::cout << "point" << std::endl;
+//                    std::cout << rec.p.x << " " << rec.p.y << " " << rec.p.z << std::endl;
+//
+//                    std::cout << "orig" << std::endl;
+//                    std::cout << orig.x << " " << orig.y << " " << orig.z << std::endl;
+//
+//                    std::cout << "dir" << std::endl;
+//                    std::cout << dir.x << " " << dir.y << " " << dir.z << std::endl;
+//
+//                    std::cout << "normal" << std::endl;
+//                    std::cout << rec.normal.x << " " << rec.normal.y << " " << rec.normal.z << std::endl;
+//
+//                    glm::vec3 reflectionDirection = normalize(reflect(dir, rec.normal));
+//                    std::cout << "reflectionDirection" << std::endl;
+//                    std::cout << reflectionDirection.x << " " << reflectionDirection.y << " " << reflectionDirection.z << std::endl;
+//
+//                    return getReflectionColor(
+//                            rec, dir, options, depth, objects, lights);
+//                }
+
+
+                float NdotView = std::max(0.f, glm::dot(rec.normal, -dir));
                 const int M = 10;
-                float checker = (fmod(st.x * M, 1.0f) > 0.5f) ^ (fmod(st.y * M, 1.0f) < 0.5f);
+                float checker = (fmod(rec.st.x * M, 1.0f) > 0.5f) ^ (fmod(rec.st.y * M, 1.0f) < 0.5f);
                 float c = 0.3 * (1 - checker) + 0.7 * checker;
 
                 hitColor = { c * NdotView,c * NdotView,c * NdotView }; //Vec3f(uv.x, uv.y, 0);
@@ -634,23 +656,24 @@ glm::vec3 castRay(
                 // We use the Phong illumination model int the default case. The phong model
                 // is composed of a diffuse and a specular reflection component.
 
-                glm::vec3 lightAmt = glm::vec3(0,0,0), specularColor =  glm::vec3(0,0,0);
-                glm::vec3 shadowPointOrig = (glm::dot(dir, N) < 0) ?
-                    hitPoint + N * options.bias :
-                    hitPoint - N * options.bias;
+                glm::vec3 lightAmt = glm::vec3(0,0,0);
+                glm::vec3 specularColor =  glm::vec3(0,0,0);
+                glm::vec3 shadowPointOrig = (glm::dot(dir, rec.normal) < 0) ?
+                                            rec.p +  rec.normal * options.bias :
+                                            rec.p  -  rec.normal * options.bias;
 
                 // Loop over all lights in the scene and sum their contribution up
                 // We also apply the lambert cosine law here though we haven't explained yet what this means.
                 for (const auto &light : lights) {
-                    glm::vec3 lightDir = light->position - hitPoint;
+                    glm::vec3 lightDir = light->position -  rec.p ;
                     lightDir = normalize(lightDir);
-                    float cosine = std::max(0.f, glm::dot(lightDir, N));
+                    float cosine = std::max(0.f, glm::dot(lightDir,  rec.normal));
                     // cosine is the cosine of the angle between the light direction and the normal
                     // at the intersection point. If cosine is 0, then the light is perpendicular to the
                     // surface and thus does not contribute to the illumination of the surface.
                     // If cosine is 1, then the light is parallel to the surface and thus contributes
                     // the maximum amount of illumination to the surface.
-                    
+
                     //Hittable *shadowHitObject = nullptr;
                     hit_record shadowRec;
                     // is the point in shadow, and is the nearest occluding Hittable closer to the Hittable than the light itself?
@@ -661,10 +684,10 @@ glm::vec3 castRay(
                        lightAmt += light->intensity * cosine;
                     }
 
-                    glm::vec3 reflectionDirection = reflect(-lightDir, N);
+                    glm::vec3 reflectionDirection = reflect(-lightDir,  rec.normal);
                     specularColor += powf(std::max(0.f, -glm::dot(reflectionDirection, dir)), rec.object->specularExponent) * light->intensity;
                 }
-                hitColor = lightAmt * rec.object->evalDiffuseColor(st) * rec.object->Kd + specularColor * rec.object->Ks;
+                hitColor = lightAmt * rec.object->evalDiffuseColor( rec.st) * rec.object->Kd + specularColor * rec.object->Ks;
                 break;
             }
         }
@@ -886,8 +909,8 @@ int main()
     options.height =300;
     options.fov = 80;
     options.backgroundColor = glm::vec3(0.235294, 0.67451, 0.843137);
-    options.maxDepth = 2;
-    options.bias = 0.00001;
+    options.maxDepth = 10;
+    options.bias = 0.005;
     //cameraToWorld is the inverse of the camera matrix
     //it is the matrix that transforms from world space to camera space
     //we create it by rotating around the y-axis by 180 degrees and then translating by (0,0,5)
